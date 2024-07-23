@@ -23,6 +23,7 @@ Please select your desired configuration from the list bellow:
 . ./mfc.sh load
 ```
 
+<a id="via-aptitude"></a>
 - **Via [Aptitude](https://wiki.debian.org/Aptitude):**
 
 ```shell
@@ -59,29 +60,38 @@ On Windows, you can either use Intel Compilers with the standard Microsoft toolc
 [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) for a Linux experience.
 
  <details>
-   <summary><h3>Windows + Intel (Native)</h3></summary>
+
+   <summary><h3>Windows + WSL (Recommended)</h3></summary>
+
+Install [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) on Windows 11:
+1. Open the Start menu, search for "Windows Features", and select "Turn Windows features on or off". Enable "Windows Subsystem for Linux" by checking the corresponding box.
+2. Open the Microsoft Store, search for "Linux", and install your preferred distribution (e.g., [Ubuntu](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV))
+3. Verify the installation by typing `wsl` in a command prompt
+
+Useful software to install for using WSL on Windows:
+- [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)
+- [Visual Studio Code](https://code.visualstudio.com/) and the [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) extension
+
+Once you have WSL installed, you can follow the instructions for *nix systems above (for Ubuntu, see [Via Aptitude](#via-aptitude)).
+
+  </details>
+
+  <details>
+
+   <summary><h3>Windows (Native)</h3></summary>
 
 Install the latest version of:
 - [Microsoft Visual Studio Community](https://visualstudio.microsoft.com/)
 - [Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html)
 - [Intel® oneAPI HPC Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)
 
-Then, in order to initialize your development environment, open a terminal window and run:
+Then, in order to initialize your development environment, open a command prompt terminal (not PowerShell) and run the following command:
 ```shell
 "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 ```
 
-To follow this guide, please replace `./mfc.sh` with `mfc.bat` when running any commands. `./mfc.sh` is intended Unix-like systems.
+To follow this guide, please remain in that terminal window and replace `./mfc.sh` with `.\mfc.bat` when running any commands.
 You will also have access to the `.sln` Microsoft Visual Studio solution files for an IDE (Integrated Development Environment).
-
-  </details>
-
-  <details>
-     <summary><h3>Windows + WSL</h3></summary>
-
-Install the latest version of the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) as well as a distribution such as Ubuntu which can be found [here](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV). Acquiring an   interactive session is as simple as typing `wsl` in your command prompt, or alternatively, selecting the distribution from the dropdown menu available in the [Microsoft Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701).
-
-You can now follow the appropriate instructions for your distribution.
 
   </details>
 
