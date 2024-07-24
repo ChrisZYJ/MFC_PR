@@ -90,6 +90,7 @@ Install the latest version of:
 - [Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html)
 - [Intel® oneAPI HPC Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/hpc-toolkit-download.html)
 - [Strawberry Perl](https://strawberryperl.com/) (Install and add `C:\strawberry\perl\bin\perl.exe` or your installation path to your [PATH](https://www.architectryan.com/2018/03/17/add-to-the-path-on-windows-10/))
+Please note that Visual Studio must be installed first, and the oneAPI Toolkits need to be configured with the installed Visual Studio, even if you plan to use a different IDE.
 
 Then, in order to initialize your development environment, run the following command (or your installation path) in command prompt:
 ```shell
