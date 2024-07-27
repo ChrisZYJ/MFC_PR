@@ -63,6 +63,7 @@ contains
             num_fluids, mpp_lim, adv_alphan, &
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
+            output_partial_domain, x_output, y_output, z_output, &
             hypoelasticity, G, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
             E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
@@ -173,11 +174,17 @@ contains
 
         integer :: i, j, k, l
 
+        integer :: m_min, m_max, n_min, n_max, p_min, p_max
+
+        if (output_partial_domain) then
+            call s_define_output_region(m_min, m_max, n_min, n_max, p_min, p_max)
+        end if
+
         ! Opening a new formatted database file
-        call s_open_formatted_database_file(t_step)
+        call s_open_formatted_database_file(m_min, m_max, n_min, n_max, p_min, p_max, t_step)
 
         ! Adding the grid to the formatted database file
-        call s_write_grid_to_formatted_database_file(t_step)
+        call s_write_grid_to_formatted_database_file(m_min, m_max, n_min, n_max, p_min, p_max, t_step)
 
         ! Computing centered finite-difference coefficients in x-direction
         if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt) then
@@ -228,9 +235,15 @@ contains
             .or. &
             (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
 
-            q_sf = rho_sf(-offset_x%beg:m + offset_x%end, &
-                          -offset_y%beg:n + offset_y%end, &
-                          -offset_z%beg:p + offset_z%end)
+            if (output_partial_domain) then
+                q_sf = rho_sf(-offset_x%beg + m_min : offset_x%end + m_max, &
+                              -offset_y%beg + n_min : offset_y%end + n_max, &
+                              -offset_z%beg + p_min : offset_z%end + p_max)
+            else
+                q_sf = rho_sf(-offset_x%beg:m + offset_x%end, &
+                              -offset_y%beg:n + offset_y%end, &
+                              -offset_z%beg:p + offset_z%end)
+            end if
 
             write (varname, '(A)') 'rho'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -244,10 +257,17 @@ contains
         do i = 1, E_idx - mom_idx%beg
             if (mom_wrt(i) .or. cons_vars_wrt) then
 
-                q_sf = q_cons_vf(i + cont_idx%end)%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                if (output_partial_domain) then
+                    q_sf = q_cons_vf(i + cont_idx%end)%sf( &
+                        -offset_x%beg + m_min : offset_x%end + m_max, &
+                        -offset_y%beg + n_min : offset_y%end + n_max, &
+                        -offset_z%beg + p_min : offset_z%end + p_max)
+                else
+                    q_sf = q_cons_vf(i + cont_idx%end)%sf( &
+                        -offset_x%beg:m + offset_x%end, &
+                        -offset_y%beg:n + offset_y%end, &
+                        -offset_z%beg:p + offset_z%end)
+                end if
 
                 write (varname, '(A,I0)') 'mom', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -262,10 +282,17 @@ contains
         do i = 1, E_idx - mom_idx%beg
             if (vel_wrt(i) .or. prim_vars_wrt) then
 
-                q_sf = q_prim_vf(i + cont_idx%end)%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                if (output_partial_domain) then
+                    q_sf = q_prim_vf(i + cont_idx%end)%sf( &
+                        -offset_x%beg + m_min : offset_x%end + m_max, &
+                        -offset_y%beg + n_min : offset_y%end + n_max, &
+                        -offset_z%beg + p_min : offset_z%end + p_max)
+                else
+                    q_sf = q_prim_vf(i + cont_idx%end)%sf( &
+                        -offset_x%beg:m + offset_x%end, &
+                        -offset_y%beg:n + offset_y%end, &
+                        -offset_z%beg:p + offset_z%end)
+                end if
 
                 write (varname, '(A,I0)') 'vel', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -293,9 +320,17 @@ contains
         ! Adding the energy to the formatted database file ---------------------
         if (E_wrt .or. cons_vars_wrt) then
 
-            q_sf = q_cons_vf(E_idx)%sf(-offset_x%beg:m + offset_x%end, &
-                                       -offset_y%beg:n + offset_y%end, &
-                                       -offset_z%beg:p + offset_z%end)
+            if (output_partial_domain) then
+                q_sf = q_cons_vf(E_idx)%sf( &
+                    -offset_x%beg + m_min : offset_x%end + m_max, &
+                    -offset_y%beg + n_min : offset_y%end + n_max, &
+                    -offset_z%beg + p_min : offset_z%end + p_max)
+            else
+                q_sf = q_cons_vf(E_idx)%sf( &
+                    -offset_x%beg:m + offset_x%end, &
+                    -offset_y%beg:n + offset_y%end, &
+                    -offset_z%beg:p + offset_z%end)
+            end if
 
             write (varname, '(A)') 'E'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -308,15 +343,22 @@ contains
         ! Adding the elastic shear stresses to the formatted database file -----
         if (hypoelasticity) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
-                if (prim_vars_wrt) then
-                    q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
+                ! if (prim_vars_wrt) then ! TEMP: NOT CHECKED
+                    if (output_partial_domain) then
+                        q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
+                            -offset_x%beg + m_min : offset_x%end + m_max, &
+                            -offset_y%beg + n_min : offset_y%end + n_max, &
+                            -offset_z%beg + p_min : offset_z%end + p_max)
+                    else
+                        q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf( &
+                            -offset_x%beg:m + offset_x%end, &
+                            -offset_y%beg:n + offset_y%end, &
+                            -offset_z%beg:p + offset_z%end)
+                    end if
 
                     write (varname, '(A,I0)') 'tau', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                ! end if
                 varname(:) = ' '
             end do
         end if
@@ -325,9 +367,17 @@ contains
         ! Adding the pressure to the formatted database file -------------------
         if (pres_wrt .or. prim_vars_wrt) then
 
-            q_sf = q_prim_vf(E_idx)%sf(-offset_x%beg:m + offset_x%end, &
-                                       -offset_y%beg:n + offset_y%end, &
-                                       -offset_z%beg:p + offset_z%end)
+            if (output_partial_domain) then
+                q_sf = q_prim_vf(E_idx)%sf( &
+                    -offset_x%beg + m_min : offset_x%end + m_max, &
+                    -offset_y%beg + n_min : offset_y%end + n_max, &
+                    -offset_z%beg + p_min : offset_z%end + p_max)
+            else
+                q_sf = q_prim_vf(E_idx)%sf( &
+                    -offset_x%beg:m + offset_x%end, &
+                    -offset_y%beg:n + offset_y%end, &
+                    -offset_z%beg:p + offset_z%end)
+            end if
 
             write (varname, '(A)') 'pres'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -345,10 +395,17 @@ contains
             do i = 1, num_fluids - 1
                 if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
 
-                    q_sf = q_cons_vf(i + E_idx)%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
+                    if (output_partial_domain) then
+                        q_sf = q_cons_vf(i + E_idx)%sf( &
+                            -offset_x%beg + m_min : offset_x%end + m_max, &
+                            -offset_y%beg + n_min : offset_y%end + n_max, &
+                            -offset_z%beg + p_min : offset_z%end + p_max)
+                    else
+                        q_sf = q_cons_vf(i + E_idx)%sf( &
+                            -offset_x%beg:m + offset_x%end, &
+                            -offset_y%beg:n + offset_y%end, &
+                            -offset_z%beg:p + offset_z%end)
+                    end if
 
                     write (varname, '(A,I0)') 'alpha', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -362,10 +419,17 @@ contains
                 .or. &
                 (cons_vars_wrt .or. prim_vars_wrt)) then
 
-                q_sf = q_cons_vf(adv_idx%end)%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                if (output_partial_domain) then
+                    q_sf = q_cons_vf(adv_idx%end)%sf( &
+                        -offset_x%beg + m_min : offset_x%end + m_max, &
+                        -offset_y%beg + n_min : offset_y%end + n_max, &
+                        -offset_z%beg + p_min : offset_z%end + p_max)
+                else
+                    q_sf = q_cons_vf(adv_idx%end)%sf( &
+                        -offset_x%beg:m + offset_x%end, &
+                        -offset_y%beg:n + offset_y%end, &
+                        -offset_z%beg:p + offset_z%end)
+                end if
 
                 write (varname, '(A,I0)') 'alpha', num_fluids
                 call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -382,9 +446,15 @@ contains
             .or. &
             (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
 
-            q_sf = gamma_sf(-offset_x%beg:m + offset_x%end, &
-                            -offset_y%beg:n + offset_y%end, &
-                            -offset_z%beg:p + offset_z%end)
+            if (output_partial_domain) then
+                q_sf = gamma_sf(-offset_x%beg + m_min : offset_x%end + m_max, &
+                                 -offset_y%beg + n_min : offset_y%end + n_max, &
+                                 -offset_z%beg + p_min : offset_z%end + p_max)
+            else
+                q_sf = gamma_sf(-offset_x%beg:m + offset_x%end, &
+                                 -offset_y%beg:n + offset_y%end, &
+                                 -offset_z%beg:p + offset_z%end)
+            end if
 
             write (varname, '(A)') 'gamma'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -412,9 +482,15 @@ contains
             .or. &
             (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
 
-            q_sf = pi_inf_sf(-offset_x%beg:m + offset_x%end, &
-                             -offset_y%beg:n + offset_y%end, &
-                             -offset_z%beg:p + offset_z%end)
+            if (output_partial_domain) then
+                q_sf = pi_inf_sf(-offset_x%beg + m_min : offset_x%end + m_max, &
+                                 -offset_y%beg + n_min : offset_y%end + n_max, &
+                                 -offset_z%beg + p_min : offset_z%end + p_max)
+            else
+                q_sf = pi_inf_sf(-offset_x%beg:m + offset_x%end, &
+                                 -offset_y%beg:n + offset_y%end, &
+                                 -offset_z%beg:p + offset_z%end)
+            end if
 
             write (varname, '(A)') 'pi_inf'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -555,10 +631,17 @@ contains
         ! Adding the volume fraction(s) to the formatted database file ---------
         if (bubbles) then
             do i = adv_idx%beg, adv_idx%end
-                q_sf = q_cons_vf(i)%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                if (output_partial_domain) then
+                    q_sf = q_cons_vf(i)%sf( &
+                        -offset_x%beg + m_min : offset_x%end + m_max, &
+                        -offset_y%beg + n_min : offset_y%end + n_max, &
+                        -offset_z%beg + p_min : offset_z%end + p_max)
+                else
+                    q_sf = q_cons_vf(i)%sf( &
+                        -offset_x%beg:m + offset_x%end, &
+                        -offset_y%beg:n + offset_y%end, &
+                        -offset_z%beg:p + offset_z%end)
+                end if
 
                 write (varname, '(A,I0)') 'alpha', i - E_idx
                 call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -570,10 +653,17 @@ contains
         if (bubbles) then
             !nR
             do i = 1, nb
-                q_sf = q_cons_vf(bub_idx%rs(i))%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                if (output_partial_domain) then
+                    q_sf = q_cons_vf(bub_idx%rs(i))%sf( &
+                           -offset_x%beg + m_min : offset_x%end + m_max, &
+                           -offset_y%beg + n_min : offset_y%end + n_max, &
+                           -offset_z%beg + p_min : offset_z%end + p_max)
+                else
+                    q_sf = q_cons_vf(bub_idx%rs(i))%sf( &
+                           -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
+                end if
                 write (varname, '(A,I3.3)') 'nR', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
@@ -581,10 +671,17 @@ contains
 
             !nRdot
             do i = 1, nb
-                q_sf = q_cons_vf(bub_idx%vs(i))%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                if (output_partial_domain) then
+                    q_sf = q_cons_vf(bub_idx%vs(i))%sf( &
+                           -offset_x%beg + m_min : offset_x%end + m_max, &
+                           -offset_y%beg + n_min : offset_y%end + n_max, &
+                           -offset_z%beg + p_min : offset_z%end + p_max)
+                else
+                    q_sf = q_cons_vf(bub_idx%vs(i))%sf( &
+                           -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
+                end if
                 write (varname, '(A,I3.3)') 'nV', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
@@ -592,10 +689,17 @@ contains
             if ((polytropic .neqv. .true.) .and. (.not. qbmm)) then
                 !nP
                 do i = 1, nb
-                    q_sf = q_cons_vf(bub_idx%ps(i))%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
+                    if (output_partial_domain) then
+                        q_sf = q_cons_vf(bub_idx%ps(i))%sf( &
+                               -offset_x%beg + m_min : offset_x%end + m_max, &
+                               -offset_y%beg + n_min : offset_y%end + n_max, &
+                               -offset_z%beg + p_min : offset_z%end + p_max)
+                    else
+                        q_sf = q_cons_vf(bub_idx%ps(i))%sf( &
+                               -offset_x%beg:m + offset_x%end, &
+                               -offset_y%beg:n + offset_y%end, &
+                               -offset_z%beg:p + offset_z%end)
+                    end if
                     write (varname, '(A,I3.3)') 'nP', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                     varname(:) = ' '
@@ -603,10 +707,17 @@ contains
 
                 !nM
                 do i = 1, nb
-                    q_sf = q_cons_vf(bub_idx%ms(i))%sf( &
-                           -offset_x%beg:m + offset_x%end, &
-                           -offset_y%beg:n + offset_y%end, &
-                           -offset_z%beg:p + offset_z%end)
+                    if (output_partial_domain) then
+                        q_sf = q_cons_vf(bub_idx%ms(i))%sf( &
+                               -offset_x%beg + m_min : offset_x%end + m_max, &
+                               -offset_y%beg + n_min : offset_y%end + n_max, &
+                               -offset_z%beg + p_min : offset_z%end + p_max)
+                    else
+                        q_sf = q_cons_vf(bub_idx%ms(i))%sf( &
+                               -offset_x%beg:m + offset_x%end, &
+                               -offset_y%beg:n + offset_y%end, &
+                               -offset_z%beg:p + offset_z%end)
+                    end if
                     write (varname, '(A,I3.3)') 'nM', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                     varname(:) = ' '
@@ -615,10 +726,17 @@ contains
 
             ! number density
             if (adv_n) then
-                q_sf = q_cons_vf(n_idx)%sf( &
-                       -offset_x%beg:m + offset_x%end, &
-                       -offset_y%beg:n + offset_y%end, &
-                       -offset_z%beg:p + offset_z%end)
+                if (output_partial_domain) then
+                    q_sf = q_cons_vf(n_idx)%sf( &
+                           -offset_x%beg + m_min : offset_x%end + m_max, &
+                           -offset_y%beg + n_min : offset_y%end + n_max, &
+                           -offset_z%beg + p_min : offset_z%end + p_max)
+                else
+                    q_sf = q_cons_vf(n_idx)%sf( &
+                           -offset_x%beg:m + offset_x%end, &
+                           -offset_y%beg:n + offset_y%end, &
+                           -offset_z%beg:p + offset_z%end)
+                end if
                 write (varname, '(A)') 'n'
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '

@@ -158,6 +158,10 @@ module m_global_parameters
 
     integer :: precision !< Floating point precision of the database file(s)
 
+    logical :: output_partial_domain !< Output selected region of domain
+
+    type(bounds_info) :: x_output, y_output, z_output
+
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions.
     !! The definition of the ghost zone layers is only necessary when using the
     !! Silo database file format in multidimensions. These zones provide VisIt
@@ -315,6 +319,14 @@ contains
         format = dflt_int
 
         precision = dflt_int
+
+        output_partial_domain = .false.
+        x_output%beg = 0d0
+        x_output%end = 0d0
+        y_output%beg = 0d0
+        y_output%end = 0d0
+        z_output%beg = 0d0
+        z_output%end = 0d0
 
         alpha_rho_wrt = .false.
         rho_wrt = .false.

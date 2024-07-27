@@ -26,6 +26,7 @@ module m_data_output
     implicit none
 
     private; public :: s_initialize_data_output_module, &
+ s_define_output_region, &
  s_open_formatted_database_file, &
  s_write_grid_to_formatted_database_file, &
  s_write_variable_to_formatted_database_file, &
@@ -344,6 +345,9 @@ contains
             ! Energy
             if (E_wrt .or. cons_vars_wrt) dbvars = dbvars + 1
 
+            ! Elastic stresses
+            if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+
             ! Pressure
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
 
@@ -412,7 +416,82 @@ contains
 
     end subroutine s_initialize_data_output_module
 
-    subroutine s_open_formatted_database_file(t_step)
+    subroutine s_define_output_region(m_min, m_max, n_min, n_max, p_min, p_max)
+
+        integer, intent(inout) :: m_min, m_max, n_min, n_max, p_min, p_max
+
+        integer :: i, j, k
+
+        if (precision == 1) then
+            print *, "precision = 1 with output_partial_domain is not supported"
+            call exit(1)
+        end if
+
+        do i = -offset_x%beg, m + offset_x%end
+            if (x_cc(i) > x_output%beg) then
+                m_min = i + offset_x%beg
+                exit
+            end if
+        end do
+        do i = m + offset_x%end, -offset_x%beg, -1
+            if (x_cc(i) < x_output%end) then
+                m_max = i - offset_x%end
+                exit
+            end if
+        end do
+        ! if no solid within region
+        if ((x_cc(-offset_x%beg) > x_output%end) .or. (x_cc(m + offset_x%end) < x_output%beg)) then
+            m_min = 0
+            m_max = 0
+        end if
+
+        if (n /= 0) then
+            do j = -offset_y%beg, n + offset_y%end
+                if (y_cc(j) > y_output%beg) then
+                    n_min = j + offset_y%beg
+                    exit
+                end if
+            end do
+            do j = n + offset_y%end, -offset_y%beg, -1
+                if (y_cc(j) < y_output%end) then
+                    n_max = j - offset_y%end
+                    exit
+                end if
+            end do
+            if ((y_cc(-offset_y%beg) > y_output%end) .or. (y_cc(n + offset_y%end) < y_output%beg)) then
+                n_min = 0
+                n_max = 0
+            end if
+        else
+            n_min = 0
+            n_max = 0
+        end if
+
+        if (p /= 0) then
+            do k = -offset_z%beg, p + offset_z%end
+                if (z_cc(k) > z_output%beg) then
+                    p_min = k
+                    exit
+                end if
+            end do
+            do k = p + offset_z%end, -offset_z%beg, -1
+                if (z_cc(k) < z_output%end) then
+                    p_max = k
+                    exit
+                end if
+            end do
+            if ((z_cc(-offset_z%beg) > z_output%end) .or. (z_cc(p + offset_z%end) < z_output%beg)) then
+                p_min = 0
+                p_max = 0
+            end if
+        else
+            p_min = 0
+            p_max = 0
+        end if
+
+    end subroutine s_define_output_region
+
+    subroutine s_open_formatted_database_file(m_min, m_max, n_min, n_max, p_min, p_max, t_step) ! --------------------
         ! Description: This subroutine opens a new formatted database file, or
         !              replaces an old one, and readies it for the data storage
         !              of the grid and the flow variable(s) associated with the
@@ -429,6 +508,8 @@ contains
 
         ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
+
+        integer, intent(in) :: m_min, m_max, n_min, n_max, p_min, p_max
 
         ! Silo-HDF5 Database Format ========================================
 
@@ -502,7 +583,15 @@ contains
             ! file by describing in it the dimensionality of post-processed
             ! data as well as the total number of flow variable(s) that will
             ! eventually be stored in it
-            write (dbfile) m, n, p, dbvars
+
+            if (output_partial_domain) then
+                write (dbfile)  m_max - m_min, &
+                                n_max - n_min, &
+                                p_max - p_min, &
+                                dbvars
+            else
+                write (dbfile) m, n, p, dbvars
+            end if
 
             ! Next, analogous steps to the ones above are carried out by the
             ! root process to create and setup the formatted database master
@@ -531,7 +620,7 @@ contains
 
     end subroutine s_open_formatted_database_file
 
-    subroutine s_write_grid_to_formatted_database_file(t_step)
+    subroutine s_write_grid_to_formatted_database_file(m_min, m_max, n_min, n_max, p_min, p_max, t_step) ! -----------
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
         !              the current time-step, t_step. The local processor will
@@ -563,6 +652,8 @@ contains
 
         ! Generic loop iterator
         integer :: i
+
+        integer, intent(in) :: m_min, m_max, n_min, n_max, p_min, p_max
 
         ! Silo-HDF5 Database Format ========================================
 
@@ -686,7 +777,13 @@ contains
                         real(y_cb, kind(0.0)), &
                         real(z_cb, kind(0.0))
                 else
-                    write (dbfile) x_cb, y_cb, z_cb
+                    if (output_partial_domain) then
+                        write (dbfile)  x_cb( m_min-1 : m_max+1-1 ), &
+                                        y_cb( n_min-1 : n_max+1-1 ), &
+                                        z_cb( p_min-1 : p_max+1-1 )
+                    else
+                        write (dbfile) x_cb, y_cb, z_cb
+                    end if
                 end if
 
             elseif (n > 0) then
@@ -694,7 +791,12 @@ contains
                     write (dbfile) real(x_cb, kind(0.0)), &
                         real(y_cb, kind(0.0))
                 else
-                    write (dbfile) x_cb, y_cb
+                    if (output_partial_domain) then
+                        write (dbfile)  x_cb( m_min-1 : m_max+1-1 ), &
+                                        y_cb( n_min-1 : n_max+1-1 )
+                    else
+                        write (dbfile) x_cb, y_cb
+                    end if
                 end if
 
                 ! One-dimensional local grid data is written to the formatted
@@ -705,7 +807,11 @@ contains
                 if (precision == 1) then
                     write (dbfile) real(x_cb, kind(0.0))
                 else
-                    write (dbfile) x_cb
+                    if (output_partial_domain) then
+                        write (dbfile) x_cb( m_min-1 : m_max+1-1 )
+                    else
+                        write (dbfile) x_cb
+                    end if
                 end if
 
                 if (num_procs > 1) then
