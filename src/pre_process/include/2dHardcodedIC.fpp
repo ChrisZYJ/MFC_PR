@@ -5,6 +5,12 @@
 
     real(kind(0d0)) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
 
+    ! Define non-dimensional parameters for case 205
+    real(kind(0d0)) :: Ma, Re, Pr, mygamma
+    real(kind(0d0)) :: theta
+    real(kind(0d0)) :: p, rho, u, v
+    real(kind(0d0)) :: E
+
     eps = 1e-9
 
 #:enddef
@@ -99,6 +105,38 @@
             pInt = pref + rhoH*9.81*(1.2 - intH)
             q_prim_vf(E_idx)%sf(i, j, 0) = pInt + rhoL*9.81*(intH - y_cc(j))
         end if
+
+    case (205) ! Double Periodic Shear Layer
+
+        Ma = 0.1
+        Re = 10000d0
+        Pr = 0.73
+        mygamma = 1.4d0
+
+        ! Compute pressure based on Mach number
+        p = 1.0d0 / (mygamma * Ma**2)
+
+        ! Define theta (only theta=120 is needed)
+        theta = 120.0d0
+
+        ! Initialize velocity components based on y-coordinate
+        if (y_cc(j) <= 0.5d0) then
+            u = tanh(theta * (y_cc(j) - 0.25d0))
+        else
+            u = tanh(theta * (0.75d0 - y_cc(j)))
+        end if
+
+        ! Initialize v-component based on x-coordinate (theta=120)
+        v = 0.05d0 * sin(2.0d0 * pi * x_cc(i))
+
+        ! Set momentum components
+        q_prim_vf(momxb)%sf(i, j, 0) = u
+        q_prim_vf(momxe)%sf(i, j, 0) = v
+
+        ! Compute energy based on pressure and kinetic energy
+        E = p / (mygamma - 1.0d0) + 0.5d0 * (u**2 + v**2)
+        q_prim_vf(E_idx)%sf(i, j, 0) = E
+
 
     case default
         if (proc_rank == 0) then

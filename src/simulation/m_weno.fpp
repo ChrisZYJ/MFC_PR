@@ -666,6 +666,20 @@ contains
                             do j = is1_weno%beg, is1_weno%end
                                 !$acc loop seq
                                 do i = 1, v_size
+                                    ! if (i >= mom_idx%beg .and. i <= mom_idx%end .and. i - mom_idx%beg + 1 /= weno_dir) then ! Use higher-order central difference for vL and vR if i != j for du_i/dx_j
+                                    !     ! Compute higher-order central differences for vL and vR using 5-point stencil
+                                    !     vL_rs_vf_${XYZ}$(j, k, l, i) = (     v_rs_ws_${XYZ}$(j-2, k, l, i) &
+                                    !                                     - 8d0*v_rs_ws_${XYZ}$(j-1, k, l, i) &
+                                    !                                     + 8d0*v_rs_ws_${XYZ}$(j+1, k, l, i) &
+                                    !                                     -     v_rs_ws_${XYZ}$(j+2, k, l, i)) / 12d0
+                                    
+                                    !     vR_rs_vf_${XYZ}$(j, k, l, i) = (     v_rs_ws_${XYZ}$(j-1, k, l, i) &
+                                    !                                     - 8d0*v_rs_ws_${XYZ}$(j,   k, l, i) &
+                                    !                                     + 8d0*v_rs_ws_${XYZ}$(j+2, k, l, i) &
+                                    !                                     -     v_rs_ws_${XYZ}$(j+3, k, l, i)) / 12d0
+                                    !     cycle
+                                    ! end if
+
                                     ! reconstruct from left side
 
                                     dvd(1) = v_rs_ws_${XYZ}$ (j + 2, k, l, i) &
