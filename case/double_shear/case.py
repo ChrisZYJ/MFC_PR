@@ -92,7 +92,7 @@ case_dict = {
     # ==========================================================
 
     # Fluids Physical Parameters ===============================
-    'fluid_pp(1)%gamma'            : mygamma,                       # Specific heat ratio (renamed)
+    'fluid_pp(1)%gamma'            : 1.E+00/(mygamma-1.E+00),
     'fluid_pp(1)%pi_inf'           : 0.0,
     'fluid_pp(1)%Re(1)'            : Re,                            # Shear viscosity: Re
     # ==========================================================
