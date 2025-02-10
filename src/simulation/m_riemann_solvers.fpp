@@ -553,9 +553,16 @@ contains
                                         E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                         E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                         ! Additional terms in 2D and 3D
-                                        if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                                        if (cyl_coord) then
+                                            if (i == 2) then
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                                            end if
+                                        else
+                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then ! DEBUG
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                                            end if
                                         end if
                                     end if
                                 end do
@@ -873,12 +880,17 @@ contains
                                     ! Geometrical source of the void fraction(s) is zero
                                     !$acc loop seq
                                     do i = advxb, advxe
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        ! flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
                                 end if
 
                                 if (cyl_coord .and. hypoelasticity) then
-                                    ! flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + 2) += tau_sigmasigma ! TODO
+                                    ! += tau_sigmasigma using HLL
+                                    flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + 2) + &
+                                        (s_M*tau_e_R(4) - s_P*tau_e_L(4)) &
+                                        /(s_M - s_P)
 
                                     !$acc loop seq
                                     do i = strxb, strxe

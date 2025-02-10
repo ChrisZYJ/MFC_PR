@@ -65,14 +65,18 @@ contains
         end if
 
         ! Computing centered finite difference coefficients
+        print *, 'DEBUG 1'
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, &
                                                       fd_number, fd_order)
+        print *, 'DEBUG 2'
         !$acc update device(fd_coeff_x_h)
+        print *, 'DEBUG 3'
         if (n > 0) then
             call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, &
                                                           fd_number, fd_order)
             !$acc update device(fd_coeff_y_h)
         end if
+        print *, 'DEBUG 4'
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, &
                                                           fd_number, fd_order)
@@ -96,6 +100,8 @@ contains
 
         integer :: i, k, l, q, r !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
+
+        ! print *, 'DEBUG 1', rhs_vf(strxb + 3)%sf
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
@@ -340,7 +346,7 @@ contains
                         ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
                         rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
                             rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
-                            (q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_xx - 2/3*G
+                            (q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_xx + 2/3*G
                         
                         ! S_xr -= rho * v/r * tau_xr
                         rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
@@ -350,7 +356,19 @@ contains
                         ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
                         rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
                             rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
-                            (q_prim_vf(strxb + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_rr - 2/3*G
+                            (q_prim_vf(strxb + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_rr + 2/3*G
+                        
+                        ! ! S_thetatheta -= rho * (tau_thetatheta + 2/3*G) * (du/dx + dv/dr + v/r)
+                        ! rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) - &
+                        !     rho_K_field(k, l, q)* &
+                        !     (q_prim_vf(strxb + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))* & ! tau_thetatheta + 2/3*G
+                        !     (du_dx(k, l, q) + dv_dy(k, l, q) + q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)) ! du/dx + dv/dr + v/r
+
+                        ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
+                        rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + &
+                            rho_K_field(k, l, q)*( &
+                            -( q_prim_vf(strxb + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q) ) * ( du_dx(k, l, q) + dv_dy(k, l, q) + q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l) ) &
+                            +2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K_field(k, l, q)) * q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l))
                     end do
                 end do
             end do

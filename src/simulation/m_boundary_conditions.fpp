@@ -349,10 +349,24 @@ contains
                                 -q_prim_vf(momxb)%sf(j - 1, k, l)
 
                             !$acc loop seq
-                            do i = momxb + 1, sys_size
+                            ! do i = momxb + 1, strxb - 1
+                            do i = momxb + 2, sys_size
                                 q_prim_vf(i)%sf(-j, k, l) = &
                                     q_prim_vf(i)%sf(j - 1, k, l)
                             end do
+
+                            ! TODO not just 2D
+
+                            if (hypoelasticity) then
+                                ! tau_xx: no sign change
+                                q_prim_vf(strxb)%sf(-j, k, l) = q_prim_vf(strxb)%sf(j - 1, k, l)
+                                ! tau_xy: flip sign
+                                q_prim_vf(strxb+1)%sf(-j, k, l) = -q_prim_vf(strxb+1)%sf(j - 1, k, l)
+                                ! tau_yy: no sign change
+                                q_prim_vf(strxb+2)%sf(-j, k, l) = q_prim_vf(strxb+2)%sf(j - 1, k, l)
+                                ! tau_thetatheta: no sign change
+                                if (cyl_coord) q_prim_vf(strxb+3)%sf(-j, k, l) = q_prim_vf(strxb+3)%sf(j - 1, k, l)
+                            end if
 
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg)%sf(-j, k, l) = &
@@ -398,10 +412,18 @@ contains
                                 -q_prim_vf(momxb)%sf(m - (j - 1), k, l)
 
                             !$acc loop seq
-                            do i = momxb + 1, sys_size
+                            ! do i = momxb + 1, strxb - 1
+                            do i = momxb + 2, sys_size
                                 q_prim_vf(i)%sf(m + j, k, l) = &
                                     q_prim_vf(i)%sf(m - (j - 1), k, l)
                             end do
+
+                            if (hypoelasticity) then
+                                q_prim_vf(strxb)%sf(m + j, k, l) = q_prim_vf(strxb)%sf(m - (j - 1), k, l)
+                                q_prim_vf(strxb+1)%sf(m + j, k, l) = -q_prim_vf(strxb+1)%sf(m - (j - 1), k, l)
+                                q_prim_vf(strxb+2)%sf(m + j, k, l) = q_prim_vf(strxb+2)%sf(m - (j - 1), k, l)
+                                if (cyl_coord) q_prim_vf(strxb+3)%sf(m + j, k, l) = q_prim_vf(strxb+3)%sf(m - (j - 1), k, l)
+                            end if
 
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg)%sf(m + j, k, l) = &
@@ -451,10 +473,21 @@ contains
                                 -q_prim_vf(momxb + 1)%sf(l, j - 1, k)
 
                             !$acc loop seq
+                            ! do i = momxb + 2, strxb - 1
                             do i = momxb + 2, sys_size
                                 q_prim_vf(i)%sf(l, -j, k) = &
                                     q_prim_vf(i)%sf(l, j - 1, k)
                             end do
+
+                            if (hypoelasticity) then
+                                q_prim_vf(strxb)%sf(l, -j, k) = q_prim_vf(strxb)%sf(l, j - 1, k)
+                                q_prim_vf(strxb+1)%sf(l, -j, k) = -q_prim_vf(strxb+1)%sf(l, j - 1, k)
+                                q_prim_vf(strxb+2)%sf(l, -j, k) = q_prim_vf(strxb+2)%sf(l, j - 1, k)
+                                if (cyl_coord) q_prim_vf(strxb+3)%sf(l, -j, k) = q_prim_vf(strxb+3)%sf(l, j - 1, k)
+                            end if
+                            
+                            ! print *, contxe, momxb, strxb, E_idx, cyl_coord, sys_size
+                            ! call exit(66)
 
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg + 1)%sf(l, -j, k) = &
@@ -498,10 +531,18 @@ contains
                                 -q_prim_vf(momxb + 1)%sf(l, n - (j - 1), k)
 
                             !$acc loop seq
+                            ! do i = momxb + 2, strxb - 1
                             do i = momxb + 2, sys_size
                                 q_prim_vf(i)%sf(l, n + j, k) = &
                                     q_prim_vf(i)%sf(l, n - (j - 1), k)
                             end do
+
+                            if (hypoelasticity) then
+                                q_prim_vf(strxb)%sf(l, n + j, k) = q_prim_vf(strxb)%sf(l, n - (j - 1), k)
+                                q_prim_vf(strxb+1)%sf(l, n + j, k) = -q_prim_vf(strxb+1)%sf(l, n - (j - 1), k)
+                                q_prim_vf(strxb+2)%sf(l, n + j, k) = q_prim_vf(strxb+2)%sf(l, n - (j - 1), k)
+                                if (cyl_coord) q_prim_vf(strxb+3)%sf(l, n + j, k) = q_prim_vf(strxb+3)%sf(l, n - (j - 1), k)
+                            end if
 
                             if (hyperelasticity) then
                                 q_prim_vf(xibeg + 1)%sf(l, n + j, k) = &

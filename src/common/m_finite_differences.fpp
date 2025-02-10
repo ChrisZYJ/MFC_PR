@@ -81,6 +81,7 @@ contains
             intent(IN) :: s_cc
 
         integer :: i !< Generic loop iterator
+        real(wp) :: dx0
 
         if (present(offset_s)) then
             lB = -offset_s%beg
@@ -122,6 +123,41 @@ contains
             end do
 
         end if
+
+        print *, (s_cc(2)-s_cc(1))/(s_cc(1)-s_cc(0))
+        if (abs((s_cc(2)-s_cc(1))/(s_cc(1)-s_cc(0)) - 1._wp) > 0.1_wp) then ! cyl_coord y-dir
+            print *, 'DEBUG'
+            ! ! For the uniform grid case (already given):
+            ! fd_coeff_s(-1, i) = -1._wp/(s_cc(i+1)-s_cc(i-1))
+            ! fd_coeff_s(0,  i) =  0._wp
+            ! fd_coeff_s(1,  i) = -fd_coeff_s(-1,i)
+            
+            dx0 = s_cc(3) - s_cc(2)
+
+            ! For the non‐uniform case i=1:  | 3/4*dx |  dx  |  dx  |
+            ! (evaluation at the geometric center of the middle cell)
+            fd_coeff_s(-1,1) = -64._wp/(105._wp*dx0)
+            fd_coeff_s(0, 1) =  1._wp/(7._wp*dx0)
+            fd_coeff_s(1, 1) =  7._wp/(15._wp*dx0)
+            print *, 'DEBUG at 1', fd_coeff_s(-1:1,1), s_cc(2), s_cc(1), s_cc(0)
+            
+            ! For the non‐uniform case i=0:  | 1/2*dx | 3/4*dx |  dx  |
+            ! (evaluation at the geometric center of the current cell, which here equals s_cc(0))
+            fd_coeff_s(-1,0) = -14._wp/(15._wp*dx0)
+            fd_coeff_s(0, 0) =  16._wp/(35._wp*dx0)
+            fd_coeff_s(1, 0) =  10._wp/(21._wp*dx0)
+            print *, 'DEBUG at 0', fd_coeff_s(-1:1,0), s_cc(1), s_cc(0), s_cc(-1)
+
+            print *, lB, lE
+
+            call exit(66)
+
+            ! DEBUG at 1  -29866.666666666672        7000.0000000000009        22866.666666666672        4.0816326530612245E-005   2.0408163265306119E-005   5.1020408163265306E-006
+            ! DEBUG at 0  -45733.333333333343        22400.000000000004        23333.333333333336        2.0408163265306119E-005   5.1020408163265306E-006  -5.1020408163265306E-006
+            ! DEBUG at 1  -29866.666666666672        7000.0000000000009        22866.666666666672        4.0816326530612245E-005   2.0408163265306119E-005   5.1020408163265306E-006
+            ! DEBUG at 0  -45733.333333333343        22400.000000000004        23333.333333333336        2.0408163265306119E-005   5.1020408163265306E-006  -5.1020408163265306E-006
+        end if
+        
 
     end subroutine s_compute_finite_difference_coefficients
 

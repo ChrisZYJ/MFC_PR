@@ -160,10 +160,16 @@ contains
                     if (G > 0) then
                         E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
                         ! Additional terms in 2D and 3D
-                        if ((s == stress_idx%beg + 1) .or. &
-                            (s == stress_idx%beg + 3) .or. &
-                            (s == stress_idx%beg + 4)) then
-                            E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
+                        if (cyl_coord) then
+                            if ((s == stress_idx%beg + 1)) then
+                                E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
+                            end if
+                        else
+                            if ((s == stress_idx%beg + 1) .or. &
+                                (s == stress_idx%beg + 3) .or. &
+                                (s == stress_idx%beg + 4)) then
+                                E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
+                            end if
                         end if
                     end if
                 end do
@@ -1022,11 +1028,18 @@ contains
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                 ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
                                 ! extra terms in 2 and 3D
-                                if ((i == strxb + 1) .or. &
-                                    (i == strxb + 3) .or. &
-                                    (i == strxb + 4)) then
-                                    qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                                                    ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
+                                if (cyl_coord) then
+                                    if ((i == strxb + 1)) then
+                                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                        ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
+                                    end if
+                                else
+                                    if ((i == strxb + 1) .or. &
+                                        (i == strxb + 3) .or. &
+                                        (i == strxb + 4)) then
+                                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                        ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
+                                    end if
                                 end if
                             end if
                         end do
@@ -1212,11 +1225,18 @@ contains
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
                                                                (q_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G)
                                 ! extra terms in 2 and 3D
-                                if ((i == stress_idx%beg + 1) .or. &
-                                    (i == stress_idx%beg + 3) .or. &
-                                    (i == stress_idx%beg + 4)) then
-                                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                                   (q_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G)
+                                if (cyl_coord) then
+                                    if ((i == stress_idx%beg + 1)) then
+                                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                                    (q_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G)
+                                    end if
+                                else
+                                    if ((i == stress_idx%beg + 1) .or. &
+                                        (i == stress_idx%beg + 3) .or. &
+                                        (i == stress_idx%beg + 4)) then
+                                        q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                                    (q_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G)
+                                    end if
                                 end if
                             end if
                         end do
