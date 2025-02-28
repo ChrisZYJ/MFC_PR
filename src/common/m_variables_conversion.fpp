@@ -1048,12 +1048,12 @@ contains
                         qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
                     end if
 
+                    if (cont_damage) qK_prim_vf(damage_idx)%sf(j, k, l) = qK_cons_vf(damage_idx)%sf(j, k, l)
+
                 end do
             end do
         end do
         !$acc end parallel loop
-
-        !print *, 'I got here AA'
 
     end subroutine s_convert_conservative_to_primitive_variables
 
@@ -1233,6 +1233,8 @@ contains
                     if (surface_tension) then
                         q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
                     end if
+
+                    if (cont_damage) q_cons_vf(damage_idx)%sf(j, k, l) = q_prim_vf(damage_idx)%sf(j, k, l)
 
                 end do
             end do

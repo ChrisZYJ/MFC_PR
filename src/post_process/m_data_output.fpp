@@ -345,6 +345,9 @@ contains
             ! Elastic stresses
             if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
 
+            ! Damage state variable
+            if (cont_damage) dbvars = dbvars + 1
+
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
 

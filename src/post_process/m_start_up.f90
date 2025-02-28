@@ -84,7 +84,7 @@ contains
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
-            sim_data, hyperelasticity
+            sim_data, hyperelasticity, cont_damage
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -373,6 +373,15 @@ contains
                 end if
                 varname(:) = ' '
             end do
+        end if
+
+        if (cont_damage) then
+            if (prim_vars_wrt .or. cons_vars_wrt) then ! Same for prim and cons
+                q_sf = q_cons_vf(damage_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                write (varname, '(A)') 'damage_state'
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+            end if
+            varname(:) = ' '
         end if
 
         ! Adding the pressure to the formatted database file

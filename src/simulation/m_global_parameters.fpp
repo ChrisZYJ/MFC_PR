@@ -150,6 +150,7 @@ module m_global_parameters
     logical :: viscous       !< Viscous effects
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
+    logical :: cont_damage   !< Continuum damage modeling
 
     !$acc declare create(chemistry)
 
@@ -170,7 +171,7 @@ module m_global_parameters
         !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -234,6 +235,7 @@ module m_global_parameters
     integer :: tensor_size                             !< Number of elements in the full tensor plus one
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
     integer :: c_idx                                   !< Index of color function
+    integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
     !> @}
 
     !$acc declare create(bub_idx)
@@ -537,6 +539,7 @@ contains
         viscous = .false.
         shear_stress = .false.
         bulk_stress = .false.
+        cont_damage = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
@@ -914,6 +917,11 @@ contains
                 if (surface_tension) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
+                end if
+
+                if (cont_damage) then
+                    damage_idx = sys_size + 1
+                    sys_size = damage_idx
                 end if
 
             else if (model_eqns == 3) then

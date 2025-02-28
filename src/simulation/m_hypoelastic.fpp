@@ -16,7 +16,8 @@ module m_hypoelastic
 
     private; public :: s_initialize_hypoelastic_module, &
  s_finalize_hypoelastic_module, &
- s_compute_hypoelastic_rhs
+ s_compute_hypoelastic_rhs, &
+ s_compute_damage_state
 
     real(wp), allocatable, dimension(:) :: Gs
     !$acc declare create(Gs)
@@ -349,5 +350,80 @@ contains
         end if
 
     end subroutine s_finalize_hypoelastic_module
+
+    subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+
+        real(wp) :: tau_p ! principal stress
+        real(wp) :: tau_xx, tau_xy, tau_yy, tau_zz, tau_yz, tau_xz
+        real(wp) :: I1, I2, I3, argument, phi, sqrt_term
+        integer :: q, l, k
+
+        ! Hard-coded for now
+        real(wp) :: tau_s, s, alpha_bar ! tau_star, s, alpha_bar; constant model parameters determined empirically
+
+        tau_s = 0.0_wp
+        s = 2.0_wp
+        alpha_bar = 1e-3_wp
+
+        if (n == 0) then
+            l = 0; q = 0
+            !$acc parallel loop collapse(1) gang vector default(present)
+            do k = 0, m
+                rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_s, 0._wp))**s
+                print *, q_cons_vf(stress_idx%beg)%sf(k, l, q), rhs_vf(damage_idx)%sf(k, l, q)
+            end do
+        elseif (p == 0) then
+            q = 0
+            !$acc parallel loop collapse(2) gang vector default(present)
+            do l = 0, n
+                do k = 0, m
+                    ! Maximum principal stress
+                    tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + &
+                                    q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)) + &
+                            sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - &
+                                  q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2 + &
+                                 4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2)/2._wp
+
+                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_s, 0._wp))**s
+                end do
+            end do
+        else
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        tau_xx = q_cons_vf(stress_idx%beg)%sf(k, l, q)
+                        tau_xy = q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)
+                        tau_yy = q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)
+                        tau_zz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
+                        tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
+                        tau_xz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
+
+                        ! Invariants of the stress tensor
+                        I1 = tau_xx + tau_yy + tau_zz
+                        I2 = tau_xx*tau_yy + tau_xx*tau_zz + tau_yy*tau_zz - &
+                             (tau_xy**2 + tau_xz**2 + tau_yz**2)
+                        I3 = tau_xx*tau_yy*tau_zz + 2.0_wp*tau_xy*tau_xz*tau_yz - &
+                             tau_xx*tau_yz**2 - tau_yy*tau_xz**2 - tau_zz*tau_xy**2
+
+                        ! Maximum principal stress
+                        argument = (2.0_wp*I1**3 - 9.0_wp*I1*I2 + 27.0_wp*I3)/ &
+                                   (2.0_wp*sqrt(max((I1**2 - 3.0_wp*I2)**3, 0.0_wp)))
+                        if (argument > 1.0_wp) argument = 1.0_wp
+                        if (argument < -1.0_wp) argument = -1.0_wp
+                        phi = acos(argument)
+                        sqrt_term = sqrt(max(I1**2 - 3.0_wp*I2, 0.0_wp))
+                        tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term*cos(phi/3.0_wp)
+
+                        rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_s, 0._wp))**s
+                    end do
+                end do
+            end do
+        end if
+
+    end subroutine s_compute_damage_state
 
 end module m_hypoelastic

@@ -56,7 +56,8 @@ COMMON = {
     'cfl_const_dt': ParamType.LOG,
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
-    'rkck_adap_dt': ParamType.LOG, 
+    'rkck_adap_dt': ParamType.LOG,
+    'cont_damage': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
