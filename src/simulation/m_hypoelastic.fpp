@@ -205,6 +205,9 @@ contains
                             rho_K = rho_K + q_prim_vf(i)%sf(k, l, q) !alpha_rho_K(1)
                             G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)  !alpha_K(1) * Gs(1)
                         end do
+
+                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
+
                         rho_K_field(k, l, q) = rho_K
                         G_K_field(k, l, q) = G_K
 
@@ -366,14 +369,16 @@ contains
 
         tau_s = 0.0_wp
         s = 2.0_wp
-        alpha_bar = 1e-3_wp
+        alpha_bar = 1e-4_wp
 
         if (n == 0) then
             l = 0; q = 0
             !$acc parallel loop collapse(1) gang vector default(present)
             do k = 0, m
                 rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_s, 0._wp))**s
-                print *, q_cons_vf(stress_idx%beg)%sf(k, l, q), rhs_vf(damage_idx)%sf(k, l, q)
+! #ifdef MFC_DEBUG
+!                 print *, q_cons_vf(stress_idx%beg)%sf(k, l, q), rhs_vf(damage_idx)%sf(k, l, q)
+! #:endif
             end do
         elseif (p == 0) then
             q = 0
