@@ -143,7 +143,7 @@ for p_id in range(1, 10+1):
                       "qv", "qvp"]:
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
 
-    for real_attr in range(2, 9+1):
+    for real_attr in range(2, 99+1):
         PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
 
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
