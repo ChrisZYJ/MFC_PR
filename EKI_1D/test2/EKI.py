@@ -59,6 +59,7 @@ def run_simulation(sim_dir):
     Before running, delete any existing 'D' folder to avoid contaminating probe data.
     Runs pre_process then simulation and reads the probe file.
     """
+    # Delete the 'D' folder if it exists (only the D folder, not the whole sim_dir)
     D_path = os.path.join(sim_dir, "D")
     if os.path.exists(D_path) and os.path.isdir(D_path):
         try:
@@ -118,7 +119,6 @@ def modify_input_files(sim_dir, gamma, pi_inf, G, center, length):
             lambda m: m.group(1) + f"{G:.6e}",
             content
         )
-        # For pre_process.inp, update patch_icpp(2)%x_centroid and patch_icpp(2)%length_x.
         if inp_file == "pre_process.inp":
             content = re.sub(
                 r"(patch_icpp\(2\)%x_centroid\s*=\s*)\S+",
@@ -177,8 +177,10 @@ def simulate_member(member_id, ensemble_params, iter_folder, expected_length):
 # Generate "Observed" Data (Truth Run)
 # ----------------------------
 # True parameters:
-true_gamma  = 0.3 # fluid_pp(2)%gamma
-true_pi_inf = 7e8 # fluid_pp(2)%pi_inf
+true_gamma = 0.2941176470588235
+true_pi_inf = 720823529.4117646
+# true_gamma  = 0.3 # fluid_pp(2)%gamma
+# true_pi_inf = 7e8 # fluid_pp(2)%pi_inf
 true_G      = 1e9 # fluid_pp(2)%G
 true_center = 0.5 # patch_icpp(2)%x_centroid
 true_length = 0.5 # patch_icpp(2)%length_x
@@ -195,7 +197,7 @@ logger.info(f"Truth run complete. Expected observation length: {expected_length}
 # ----------------------------
 # Ensemble Kalman Inversion Settings
 # ----------------------------
-N_ensemble = 100
+N_ensemble = 200
 max_iter = 20
 tol = 1e-4
 alpha = 0.4
@@ -203,15 +205,26 @@ cov_inflation = 1.2  # set to 1.0 for no inflation, >1.0 to inflate covariance
 
 ensemble = np.zeros((N_ensemble, 5))
 # Generate initial guesses (with smaller deviations for gamma and pi_inf):
-ensemble[:, 0] = true_gamma
-ensemble[:, 1] = true_pi_inf
+# ensemble[:, 0] = true_gamma
+# ensemble[:, 1] = true_pi_inf
 # ensemble[:, 0] = np.clip(np.random.normal(loc=true_gamma, scale=true_gamma/1000, size=N_ensemble), true_gamma*0.8, true_gamma*1.2)     # gamma
 # ensemble[:, 1] = np.clip(np.random.normal(loc=true_pi_inf, scale=true_pi_inf/1000, size=N_ensemble), true_pi_inf*0.8, true_pi_inf*1.2) # pi_inf
-ensemble[:, 2] = np.abs(np.random.normal(loc=true_G, scale=true_G/1000, size=N_ensemble))                   # G
-ensemble[:, 3] = np.clip(np.random.normal(loc=true_center, scale=0.005, size=N_ensemble), 0.4, 0.6)         # center
-ensemble[:, 4] = np.clip(np.random.normal(loc=true_length, scale=0.005, size=N_ensemble), 0.4, 0.6)         # length
+# ensemble[:, 2] = np.abs(np.random.normal(loc=true_G, scale=true_G/1000, size=N_ensemble))                   # G
+# ensemble[:, 3] = np.clip(np.random.normal(loc=true_center, scale=0.005, size=N_ensemble), 0.4, 0.6)         # center
+# ensemble[:, 4] = np.clip(np.random.normal(loc=true_length, scale=0.005, size=N_ensemble), 0.4, 0.6)         # length
 
-# Enforce that the patch remains within [0.1, 0.9]: center - length/2 >= 0.1 and center + length/2 <= 0.9.
+ensemble[:, 0] = np.clip(np.random.normal(loc=true_gamma, scale=true_gamma/10000, size=N_ensemble), true_gamma*0.9, true_gamma*1.1)     # gamma
+ensemble[:, 1] = np.clip(np.random.normal(loc=true_pi_inf, scale=true_pi_inf/10000, size=N_ensemble), true_pi_inf*0.9, true_pi_inf*1.1) # pi_inf
+ensemble[:, 2] = np.abs(np.random.normal(loc=1.0e9, scale=1e8, size=N_ensemble))
+# ensemble[:, 2] = np.abs(np.random.normal(loc=1.5e9, scale=5e8, size=N_ensemble))
+# Generate guesses for center around 0.6 (bounded between 0.2 and 0.8)
+ensemble[:, 3] = np.clip(np.random.normal(loc=0.5, scale=0.05, size=N_ensemble), 0.2, 0.8)
+# ensemble[:, 3] = np.clip(np.random.normal(loc=0.6, scale=0.15, size=N_ensemble), 0.2, 0.8)
+# Generate guesses for length around 0.4 (no clipping here yet)
+ensemble[:, 4] = np.clip(np.random.normal(loc=0.5, scale=0.05, size=N_ensemble), 0.1, 1.0)
+# ensemble[:, 4] = np.clip(np.random.normal(loc=0.4, scale=0.15, size=N_ensemble), 0.1, 1.0)
+
+# Enforce that patch remains within [0.1, 0.9]: center - length/2 >= 0.1 and center + length/2 <= 0.9.
 for j in range(N_ensemble):
     center_val = ensemble[j, 3]
     length_val = ensemble[j, 4]
@@ -275,16 +288,16 @@ for it in range(max_iter):
         update = alpha * (K @ innovation)  # shape: (5,)
         ensemble[j, :] += update
         
-        # Enforce physical constraints:
-        ensemble[j, 0] = true_gamma
-        ensemble[j, 1] = true_pi_inf
-        # ensemble[j, 0] = np.clip(ensemble[j, 0], true_gamma*0.8, true_gamma*1.2)     # gamma
-        # ensemble[j, 1] = np.clip(ensemble[j, 1], true_pi_inf*0.8, true_pi_inf*1.2)   # pi_inf
+        # Enforce constraints:
+        # ensemble[j, 0] = true_gamma
+        # ensemble[j, 1] = true_pi_inf
+        ensemble[j, 0] = np.clip(ensemble[j, 0], true_gamma*0.99, true_gamma*1.01)     # gamma
+        ensemble[j, 1] = np.clip(ensemble[j, 1], true_pi_inf*0.99, true_pi_inf*1.01)   # pi_inf
         ensemble[j, 2] = max(1e8, ensemble[j, 2])                # G
-        ensemble[j, 3] = np.clip(ensemble[j, 3], 0.4, 0.6)       # center
-        # Leave length as is for now
+        ensemble[j, 3] = np.clip(ensemble[j, 3], 0.2, 0.8)       # center
+        ensemble[j, 4] = max(0.1, ensemble[j, 4])                # length
         
-    # Enforce patch constraints for center and length.
+    # Enforce that patch remains within [0.1, 0.9] for all ensemble members.
     for j in range(N_ensemble):
         center_val = ensemble[j, 3]
         length_val = ensemble[j, 4]
@@ -341,17 +354,17 @@ logger.info(f"patch_icpp(2)%length_x: {estimated_params[4]:.6f}")
 # ----------------------------
 fig, axs = plt.subplots(1, 5, figsize=(20, 4))
 axs[0].hist(ensemble[:, 0], bins=15, alpha=0.7, label='Ensemble')
-axs[0].axvline(true_gamma, color='r', linestyle='--', label='True γ')
-axs[0].set_xlabel("fluid_pp(2)%γ")
+axs[0].axvline(true_gamma, color='r', linestyle='--', label='True gamma')
+axs[0].set_xlabel("fluid_pp(2)%gamma")
 axs[0].set_ylabel('Frequency')
-axs[0].set_title("Distribution of γ")
+axs[0].set_title("Distribution of gamma")
 axs[0].legend()
 
 axs[1].hist(ensemble[:, 1], bins=15, alpha=0.7, label='Ensemble')
-axs[1].axvline(true_pi_inf, color='r', linestyle='--', label='True π_inf')
-axs[1].set_xlabel("fluid_pp(2)%π_inf")
+axs[1].axvline(true_pi_inf, color='r', linestyle='--', label='True pi_inf')
+axs[1].set_xlabel("fluid_pp(2)%pi_inf")
 axs[1].set_ylabel('Frequency')
-axs[1].set_title("Distribution of π_inf")
+axs[1].set_title("Distribution of pi_inf")
 axs[1].legend()
 
 axs[2].hist(ensemble[:, 2], bins=15, alpha=0.7, label='Ensemble')
@@ -385,8 +398,8 @@ logger.info(f"Saved ensemble distribution plots to {plot_filename}")
 # Save Convergence History Plot
 # ----------------------------
 plt.figure(figsize=(10, 6))
-plt.errorbar(iters, gamma_means, yerr=gamma_stds, fmt='-o', capsize=5, label="γ (normalized)")
-plt.errorbar(iters, pi_inf_means, yerr=pi_inf_stds, fmt='-s', capsize=5, label="π_inf (normalized)")
+plt.errorbar(iters, gamma_means, yerr=gamma_stds, fmt='-o', capsize=5, label="gamma (normalized)")
+plt.errorbar(iters, pi_inf_means, yerr=pi_inf_stds, fmt='-s', capsize=5, label="pi_inf (normalized)")
 plt.errorbar(iters, G_means, yerr=G_stds, fmt='-^', capsize=5, label="G (normalized)")
 plt.errorbar(iters, center_means, yerr=center_stds, fmt='-d', capsize=5, label="Center (normalized)")
 plt.errorbar(iters, length_means, yerr=length_stds, fmt='-v', capsize=5, label="Length (normalized)")

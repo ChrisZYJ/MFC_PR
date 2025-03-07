@@ -52,17 +52,12 @@ EKI_CONFIG = {
 }
 noise_level = 0.01
 
+# New: Number of probes to use in the simulation output
+NUM_PROBES = 4
+
 # ----------------------------
 # Parameter Configuration
 # ----------------------------
-# To remove a parameter, simply remove it from param_names and its entry in PARAM_CONFIG.
-# Each parameter's configuration now includes:
-#   - true: its true value.
-#   - guess_mean, guess_std: settings for initial guesses.
-#   - clip: clipping limits for initial guess.
-#   - update_clip: clipping limits applied after each update.
-#   - files: a dict mapping file names to the string pattern to search for.
-#   - fmt: the numeric format to use when updating the file.
 param_names = ["G", "center", "length"]
 PARAM_CONFIG = {
     "G": {
@@ -103,7 +98,7 @@ PARAM_CONFIG = {
 # ----------------------------
 
 def run_simulation(sim_dir):
-    """Run pre_process and simulation executables, then load the probe file."""
+    """Run pre_process and simulation executables, then load the probe files."""
     D_path = os.path.join(sim_dir, "D")
     if os.path.isdir(D_path):
         try:
@@ -122,13 +117,22 @@ def run_simulation(sim_dir):
     except subprocess.CalledProcessError as e:
         logger.error(f"Simulation failed in {sim_dir}: {e}")
         raise RuntimeError(f"Simulation failed in {sim_dir}: {e}")
-    probe_file = os.path.join(sim_dir, "D", "probe1_prim.dat")
-    if not os.path.exists(probe_file):
-        msg = f"Output probe file not found in {sim_dir}/D/probe1_prim.dat"
-        logger.error(msg)
-        raise FileNotFoundError(msg)
-    p_full = np.loadtxt(probe_file)
-    logger.debug(f"Read probe file in {sim_dir} with shape {p_full.shape}")
+    
+    # Loop over the expected number of probes and load each file
+    probe_data_list = []
+    for i in range(1, NUM_PROBES + 1):
+        probe_file = os.path.join(sim_dir, "D", f"probe{i}_prim.dat")
+        if not os.path.exists(probe_file):
+            msg = f"Output probe file not found: {probe_file}"
+            logger.error(msg)
+            raise FileNotFoundError(msg)
+        p_data = np.loadtxt(probe_file)
+        logger.debug(f"Read probe file {probe_file} with shape {p_data.shape}")
+        probe_data_list.append(p_data)
+    
+    # Concatenate probe data along the time axis (flattening into one long vector)
+    p_full = np.concatenate(probe_data_list)
+    logger.debug(f"Concatenated probe data shape: {p_full.shape}")
     return p_full
 
 def modify_input_files(sim_dir, params):
@@ -141,13 +145,11 @@ def modify_input_files(sim_dir, params):
         file_path = os.path.join(sim_dir, inp_file)
         with open(file_path, 'r') as f:
             content = f.read()
-        # Loop over all configured parameters and update if the current file is relevant.
         for key, cfg in PARAM_CONFIG.items():
             files_map = cfg.get("files", {})
             if inp_file in files_map:
                 pattern_str = files_map[inp_file]
                 fmt = cfg.get("fmt", ".6e")
-                # Build regex pattern using re.escape to safely match the string.
                 pattern = rf"({re.escape(pattern_str)}\s*=\s*)\S+"
                 content = re.sub(pattern,
                                  lambda m: m.group(1) + f"{params[key]:{fmt}}",
@@ -175,7 +177,8 @@ def simulate_member(member_id, param_vector, iter_folder, expected_length):
         p_model_full = run_simulation(sim_dir)
     except Exception as e:
         logger.error(f"Simulation error for member {member_id+1}: {e}")
-        p_model_full = np.full_like(t_full, np.nan)
+        p_model_full = np.full((expected_length,), np.nan)
+    # Subsample the concatenated probe data
     p_model = p_model_full[::SIM_CONFIG["sample_rate"]]
     if len(p_model) > expected_length:
         p_model = p_model[:expected_length]
@@ -206,6 +209,7 @@ truth_params = {key: PARAM_CONFIG[key]["true"] for key in param_names}
 truth_run_dir = prepare_simulation_folder(BASE_DIR, "truth_run")
 modify_input_files(truth_run_dir, truth_params)
 p_full_truth = run_simulation(truth_run_dir)
+# Add noise to the truth simulation and subsample the concatenated probe data
 p_obs_full = p_full_truth + noise_level * np.random.randn(len(p_full_truth))
 p_obs = p_obs_full[::SIM_CONFIG["sample_rate"]]
 expected_length = len(p_obs)

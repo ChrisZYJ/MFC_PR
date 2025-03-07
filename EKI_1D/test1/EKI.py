@@ -186,13 +186,14 @@ N_ensemble = 50
 max_iter = 20
 tol = 1e-4
 alpha = 0.4
+cov_inflation = 1.2  # set to 1.0 for no inflation, >1.0 to inflate covariance
 
 ensemble = np.zeros((N_ensemble, 3))
-# Generate guesses for G around 5e9 (e.g., mean 5e9, std 1e7)
+# Generate guesses for G around 1.5e9 (e.g., mean 1.5e9, std 5e8)
 ensemble[:, 0] = np.abs(np.random.normal(loc=1.5e9, scale=5e8, size=N_ensemble))
-# Generate guesses for center around 0.5 (bounded between 0.4 and 0.6)
+# Generate guesses for center around 0.6 (bounded between 0.2 and 0.8)
 ensemble[:, 1] = np.clip(np.random.normal(loc=0.6, scale=0.15, size=N_ensemble), 0.2, 0.8)
-# Generate guesses for length around 0.5 (bounded between 0.4 and 0.6)
+# Generate guesses for length around 0.4 (no clipping here yet)
 ensemble[:, 2] = np.random.normal(loc=0.4, scale=0.15, size=N_ensemble)
 
 # Enforce that patch remains within [0.1, 0.9]: center - length/2 >= 0.1 and center + length/2 <= 0.9.
@@ -258,17 +259,22 @@ for it in range(max_iter):
         # Enforce constraints:
         ensemble[j, 0] = max(1e8, ensemble[j, 0])  # G must be positive (min 1e8)
         ensemble[j, 1] = np.clip(ensemble[j, 1], 0.2, 0.8)
-        ensemble[j, 2] = ensemble[j, 2]
+        # No change for ensemble[j, 2] here
         
-        # Enforce that patch remains within [0.1, 0.9]: center - length/2 >= 0.1 and center + length/2 <= 0.9.
-        for j in range(N_ensemble):
-            center = ensemble[j, 1]
-            length = ensemble[j, 2]
-            if center - length/2 < 0.1:
-                length = 2 * (center - 0.1)
-            if center + length/2 > 0.9:
-                length = 2 * (0.9 - center)
-            ensemble[j, 2] = length
+    # Enforce that patch remains within [0.1, 0.9] for all ensemble members.
+    for j in range(N_ensemble):
+        center_val = ensemble[j, 1]
+        length_val = ensemble[j, 2]
+        if center_val - length_val/2 < 0.1:
+            length_val = 2 * (center_val - 0.1)
+        if center_val + length_val/2 > 0.9:
+            length_val = 2 * (0.9 - center_val)
+        ensemble[j, 2] = length_val
+
+    # Apply covariance inflation if enabled.
+    if cov_inflation != 1.0:
+        m_post = np.mean(ensemble, axis=0)
+        ensemble = m_post + cov_inflation * (ensemble - m_post)
     
     spread = np.std(ensemble, axis=0)
     mean_val = np.mean(ensemble, axis=0)
@@ -329,11 +335,11 @@ logger.info(f"Saved ensemble distribution plots to {plot_filename}")
 # ----------------------------
 plt.figure(figsize=(10, 6))
 # Plot for Young's Modulus (G)
-plt.errorbar(iters, G_means, yerr=G_stds, fmt='-o', label="G (normalized)")
+plt.errorbar(iters, G_means, yerr=G_stds, fmt='-o', capsize=5, label="G (normalized)")
 # Plot for patch center
-plt.errorbar(iters, center_means, yerr=center_stds, fmt='-s', label="Center (normalized)")
+plt.errorbar(iters, center_means, yerr=center_stds, fmt='-s', capsize=5, label="Center (normalized)")
 # Plot for patch length
-plt.errorbar(iters, length_means, yerr=length_stds, fmt='-^', label="Length (normalized)")
+plt.errorbar(iters, length_means, yerr=length_stds, fmt='-^', capsize=5, label="Length (normalized)")
 
 plt.xlabel("Iteration")
 plt.ylabel("Normalized Parameter Value")

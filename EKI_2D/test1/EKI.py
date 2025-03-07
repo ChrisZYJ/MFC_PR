@@ -14,7 +14,7 @@ import logging
 # Logging configuration
 logger = logging.getLogger("EKI")
 logger.setLevel(logging.DEBUG)
-log_dir = os.path.join(os.path.expanduser("~/source/MFC_EKI/EKI_1D/test4"))
+log_dir = os.path.join(os.path.expanduser("~/source/MFC_EKI/EKI_2D/test1"))
 os.makedirs(log_dir, exist_ok=True)
 fh = logging.FileHandler(os.path.join(log_dir, "EKI.log"))
 fh.setLevel(logging.DEBUG)
@@ -28,7 +28,7 @@ logger.addHandler(ch)
 # Executable and directory paths
 PRE_PROCESS_EXEC = os.path.expanduser("~/source/MFC_EKI/build/install/83d76986fd/bin/pre_process")
 SIMULATION_EXEC = os.path.expanduser("~/source/MFC_EKI/build/install/877bac7bd7/bin/simulation")
-BASE_DIR = os.path.expanduser("~/source/MFC_EKI/EKI_1D/test4")
+BASE_DIR = os.path.expanduser("~/source/MFC_EKI/EKI_2D/test1")
 NUM_INSTANCES = 8
 
 # Simulation settings
@@ -58,7 +58,7 @@ NUM_PROBES = 9
 # ----------------------------
 # Parameter Configuration
 # ----------------------------
-param_names = ["G", "center", "length"]
+param_names = ["G", "x_center", "x_length", "y_center", "y_length"]
 PARAM_CONFIG = {
     "G": {
         "true": 1e9,
@@ -71,7 +71,7 @@ PARAM_CONFIG = {
             "simulation.inp": "fluid_pp(2)%G"
         }
     },
-    "center": {
+    "x_center": {
         "true": 0.5,
         "guess_mean": 0.6,
         "guess_std": 0.1,
@@ -81,7 +81,7 @@ PARAM_CONFIG = {
             "pre_process.inp": "patch_icpp(2)%x_centroid"
         }
     },
-    "length": {
+    "x_length": {
         "true": 0.5,
         "guess_mean": 0.4,
         "guess_std": 0.1,
@@ -89,6 +89,26 @@ PARAM_CONFIG = {
         "update_clip": (0.1, 0.8),
         "files": {
             "pre_process.inp": "patch_icpp(2)%length_x"
+        }
+    },
+    "y_center": {
+        "true": 0.5,
+        "guess_mean": 0.6,
+        "guess_std": 0.1,
+        "clip": (0.2, 0.8),
+        "update_clip": (0.2, 0.8),
+        "files": {
+            "pre_process.inp": "patch_icpp(2)%y_centroid"
+        }
+    },
+    "y_length": {
+        "true": 0.5,
+        "guess_mean": 0.4,
+        "guess_std": 0.1,
+        "clip": (0.1, 0.8),
+        "update_clip": (0.1, 0.8),
+        "files": {
+            "pre_process.inp": "patch_icpp(2)%length_y"
         }
     }
 }
@@ -188,17 +208,18 @@ def simulate_member(member_id, param_vector, iter_folder, expected_length):
     return p_model
 
 def enforce_patch_constraints(ensemble):
-    """Ensure patch [center - length/2, center + length/2] stays within [0.1, 0.9]."""
-    center_idx = param_names.index("center")
-    length_idx = param_names.index("length")
-    for j in range(ensemble.shape[0]):
-        center_val = ensemble[j, center_idx]
-        length_val = ensemble[j, length_idx]
-        if center_val - length_val / 2 < 0.1:
-            length_val = 2 * (center_val - 0.1)
-        if center_val + length_val / 2 > 0.9:
-            length_val = 2 * (0.9 - center_val)
-        ensemble[j, length_idx] = length_val
+    """Ensure patch [center - length/2, center + length/2] stays within [0.1, 0.9] for both x and y dimensions."""
+    for center_name, length_name in [('x_center', 'x_length'), ('y_center', 'y_length')]:
+        center_idx = param_names.index(center_name)
+        length_idx = param_names.index(length_name)
+        for j in range(ensemble.shape[0]):
+            center_val = ensemble[j, center_idx]
+            length_val = ensemble[j, length_idx]
+            if center_val - length_val / 2 < 0.1:
+                length_val = 2 * (center_val - 0.1)
+            if center_val + length_val / 2 > 0.9:
+                length_val = 2 * (0.9 - center_val)
+            ensemble[j, length_idx] = length_val
 
 # ----------------------------
 # MAIN SIMULATION
