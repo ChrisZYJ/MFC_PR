@@ -256,6 +256,7 @@ contains
     subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop operator
+        integer :: j !< Generic loop operator
 
         ! Logistics
         case_dir = '.'
@@ -376,14 +377,7 @@ contains
             patch_icpp(i)%qv = 0._wp
             patch_icpp(i)%qvp = 0._wp
             patch_icpp(i)%tau_e = 0._wp
-            patch_icpp(i)%a(2) = dflt_real
-            patch_icpp(i)%a(3) = dflt_real
-            patch_icpp(i)%a(4) = dflt_real
-            patch_icpp(i)%a(5) = dflt_real
-            patch_icpp(i)%a(6) = dflt_real
-            patch_icpp(i)%a(7) = dflt_real
-            patch_icpp(i)%a(8) = dflt_real
-            patch_icpp(i)%a(9) = dflt_real
+            patch_icpp(i)%a = 0._wp
             patch_icpp(i)%non_axis_sym = .false.
 
             !should get all of r0's and v0's

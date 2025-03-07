@@ -281,6 +281,9 @@ contains
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
 
+                elseif (patch_icpp(i)%geometry == 51) then
+                    call s_spherical_harmonic_new(i, patch_id_fp, q_prim_vf)
+    
                 end if
                 !> @}
             end do

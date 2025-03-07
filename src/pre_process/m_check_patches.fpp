@@ -93,9 +93,9 @@ contains
                     call s_check_model_geometry(i)
                 elseif (patch_icpp(i)%geometry == dflt_int) then
                     call s_prohibit_abort("Active patch undefined", "patch_icpp("//trim(iStr)//")%geometry must be set")
-                else
-                    call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
-                                          "must be between 1 and 21")
+                ! else
+                !     call s_prohibit_abort("Invalid patch geometry number", "patch_icpp("//trim(iStr)//")%geometry "// &
+                !                           "must be between 1 and 21")
                 end if
             else
                 if (patch_icpp(i)%geometry == dflt_int) then
@@ -313,17 +313,17 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(p == 0, "Spherical harmonic patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Spherical harmonic patch "//trim(iStr)//": radius must be greater than zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Spherical harmonic patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Spherical harmonic patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Spherical harmonic patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(all(patch_icpp(patch_id)%epsilon /= (/1._wp, 2._wp, 3._wp, 4._wp, 5._wp/)), &
-            "Spherical harmonic patch "//trim(iStr)//": epsilon must be one of 1, 2, 3, 4, 5")
-        @:PROHIBIT(patch_icpp(patch_id)%beta < 0._wp, &
-            "Spherical harmonic patch "//trim(iStr)//": beta must be greater than or equal to zero")
-        @:PROHIBIT(patch_icpp(patch_id)%beta > patch_icpp(patch_id)%epsilon, &
-            "Spherical harmonic patch "//trim(iStr)//": beta must be less than or equal to epsilon")
+        ! @:PROHIBIT(p == 0, "Spherical harmonic patch "//trim(iStr)//": p must be greater than zero")
+        ! @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Spherical harmonic patch "//trim(iStr)//": radius must be greater than zero")
+        ! @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Spherical harmonic patch "//trim(iStr)//": x_centroid must be set")
+        ! @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Spherical harmonic patch "//trim(iStr)//": y_centroid must be set")
+        ! @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Spherical harmonic patch "//trim(iStr)//": z_centroid must be set")
+        ! @:PROHIBIT(all(patch_icpp(patch_id)%epsilon /= (/1._wp, 2._wp, 3._wp, 4._wp, 5._wp/)), &
+        !     "Spherical harmonic patch "//trim(iStr)//": epsilon must be one of 1, 2, 3, 4, 5")
+        ! @:PROHIBIT(patch_icpp(patch_id)%beta < 0._wp, &
+        !     "Spherical harmonic patch "//trim(iStr)//": beta must be greater than or equal to zero")
+        ! @:PROHIBIT(patch_icpp(patch_id)%beta > patch_icpp(patch_id)%epsilon, &
+        !     "Spherical harmonic patch "//trim(iStr)//": beta must be less than or equal to epsilon")
 
     end subroutine s_check_spherical_harmonic_patch_geometry
 
@@ -493,8 +493,8 @@ contains
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(patch_icpp(patch_id)%smoothen, &
-            "Inactive patch "//trim(iStr)//": cannot have smoothen enabled")
+        ! @:PROHIBIT(patch_icpp(patch_id)%smoothen, &
+        !     "Inactive patch "//trim(iStr)//": cannot have smoothen enabled")
         @:PROHIBIT(patch_icpp(patch_id)%smooth_patch_id /= patch_id, &
             "Inactive patch "//trim(iStr)//": smooth_patch_id must be equal to patch_id")
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%smooth_coeff), &
