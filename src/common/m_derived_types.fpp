@@ -172,7 +172,7 @@ module m_derived_types
         !! The isentropic vortex parameters for the amplitude of the disturbance and
         !! domain of influence.
 
-        real(wp), dimension(2:9) :: a !<
+        real(wp), dimension(2:99) :: a !<
         !! The parameters needed for the spherical harmonic patch
 
         logical :: non_axis_sym

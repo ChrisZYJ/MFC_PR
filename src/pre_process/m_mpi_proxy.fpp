@@ -88,7 +88,7 @@ contains
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ '2', '3', '4', '5', '6', '7', '8', '9']
+            #:for VAR in range(2, 100)
                 call MPI_BCAST(patch_icpp(i)%a(${VAR}$), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 

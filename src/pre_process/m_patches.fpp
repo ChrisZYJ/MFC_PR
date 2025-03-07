@@ -50,7 +50,8 @@ module m_patches
               s_cuboid, &
               s_cylinder, &
               s_sweep_plane, &
-              s_model
+              s_model, &
+              s_spherical_harmonic_new
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -1434,7 +1435,8 @@ contains
         as(7) = patch_icpp(patch_id)%a(7)
         as(8) = patch_icpp(patch_id)%a(8)
         as(9) = patch_icpp(patch_id)%a(9)
-        non_axis_sym = patch_icpp(patch_id)%non_axis_sym
+        ! non_axis_sym = patch_icpp(patch_id)%non_axis_sym
+        non_axis_sym = .not. cyl_coord
 
         ! Since the analytical patch does not allow for its boundaries to get
         ! smoothed out, the pseudo volume fraction is set to 1 to make sure
@@ -2232,6 +2234,130 @@ contains
         call s_model_free(model)
 
     end subroutine s_model
+
+    subroutine s_spherical_harmonic_new(patch_id, patch_id_fp, q_prim_vf)
+        ! Arguments
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+    
+        ! Local variables
+        integer :: i, j, l
+        real(wp) :: x_centroid, y_centroid, radius
+        real(wp) :: r_cell, phi, new_radius, perturb, cosTheta
+        real(wp), dimension(2:99) :: coeff
+        real(wp) :: eta          ! Pseudo volume fraction for patch assignment
+        real(wp) :: delta        ! Width of the interpolation band
+        ! Assumed to be defined in the module: dx, dy, verysmall
+    
+        ! Read patch centroid, radius and the coefficients a(2:99)
+        x_centroid   = patch_icpp(patch_id)%x_centroid
+        y_centroid   = patch_icpp(patch_id)%y_centroid
+        radius       = patch_icpp(patch_id)%radius
+        do l = 2, 99
+            coeff(l) = patch_icpp(patch_id)%a(l)
+        end do
+    
+        ! This routine is for 2D (p == 0) or 2D axisymmetric cases only.
+        if (.not. ((n /= 0) .and. (p == 0))) then
+           print *, "Error in s_spherical_harmonic_new: This routine is designed for 2D or 2D axisymmetric cases only."
+           return
+        end if
+    
+        ! Set the interpolation width delta (here using one cell width)
+        delta = min(dx, dy)
+    
+        !-- 2D loops (p == 0 so only i and j loops) --
+        do j = 0, n
+            do i = 0, m
+                ! Compute the distance from cell center to patch centroid
+                r_cell = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
+                
+                if (.not. cyl_coord) then
+                    ! Non-axisymmetric 2D: use sinusoidal modes.
+                    phi = atan2(y_cc(j) - y_centroid, x_cc(i) - x_centroid)
+                    perturb = 0._wp
+                    do l = 2, 99
+                        perturb = perturb + coeff(l)*sin(real(l, wp)*phi)
+                    end do
+                else
+                    ! Axisymmetric 2D: use Legendre polynomials.
+                    if (r_cell > verysmall) then
+                        cosTheta = (x_cc(i) - x_centroid)/r_cell
+                    else
+                        cosTheta = 1._wp
+                    end if
+                    perturb = 0._wp
+                    do l = 2, 99
+                        perturb = perturb + coeff(l)*legendre_poly(cosTheta, l)
+                    end do
+                end if
+                
+                new_radius = radius + perturb
+    
+                ! --- Anti-aliasing (smoothen) using a narrow interpolation band ---
+                ! Only cells within a band of width 2*delta (centered on new_radius)
+                ! are given a fractional (interpolated) value.
+                if (patch_icpp(patch_id)%smoothen) then
+                    if (r_cell <= new_radius - delta) then
+                        eta = 1._wp
+                    else if (r_cell >= new_radius + delta) then
+                        eta = 0._wp
+                    else
+                        ! Linear interpolation: when r_cell is between new_radius-delta and new_radius+delta
+                        eta = 0.5 + 0.5*(new_radius - r_cell)/delta
+                    end if
+                else
+                    ! No smoothening: assign the patch only if the cell center is inside the patch
+                    if (r_cell <= new_radius) then
+                        eta = 1._wp
+                    else
+                        eta = 0._wp
+                    end if
+                end if
+    
+                ! Assign the patch only if there is a nonzero contribution
+                if (eta > 0._wp) then
+                    if ( patch_icpp(patch_id)%alter_patch(patch_id_fp(i,j,0)) ) then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
+                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i,j,0) = patch_id
+                    end if
+                end if
+            end do
+        end do
+    
+    contains
+    
+        !---------------------------------------------------------------------------
+        ! Internal function to compute the Legendre polynomial P_l(x)
+        ! using the standard recurrence:
+        !   P_0(x)=1, P_1(x)=x,
+        !   P_l(x) = ((2*l - 1)*x*P_{l-1}(x) - (l-1)*P_{l-2}(x))/l
+        !---------------------------------------------------------------------------
+        function legendre_poly(x, l) result(P)
+            real(wp), intent(in) :: x
+            integer, intent(in) :: l
+            real(wp) :: P
+            integer :: i
+            real(wp) :: P0, P1, P_temp
+    
+            if (l == 0) then
+                P = 1._wp
+            else if (l == 1) then
+                P = x
+            else
+                P0 = 1._wp
+                P1 = x
+                do i = 2, l
+                    P_temp = ((2._wp*real(i, wp) - 1._wp)*x*P1 - (real(i, wp)-1._wp)*P0) / real(i, wp)
+                    P0 = P1
+                    P1 = P_temp
+                end do
+                P = P1
+            end if
+        end function legendre_poly
+    
+    end subroutine s_spherical_harmonic_new    
 
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         !$acc routine seq
