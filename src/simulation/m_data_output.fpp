@@ -1166,20 +1166,22 @@ contains
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                    if (elasticity) then
+                    ! if (elasticity) then
 
-                        call s_compute_pressure( &
-                            q_cons_vf(1)%sf(j - 2, k, l), &
-                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
-                            q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
-                    else
-                        call s_compute_pressure( &
-                            q_cons_vf(1)%sf(j - 2, k, l), &
-                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                    !     call s_compute_pressure( &
+                    !         q_cons_vf(1)%sf(j - 2, k, l), &
+                    !         q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                    !         dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
+                    !         q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
+                    !         q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
+                    ! else
+                        ! call s_compute_pressure( &
+                        !     q_cons_vf(1)%sf(j - 2, k, l), &
+                        !     q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                        !     dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T)
+                        call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k, l), 0._wp, &
                             dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T)
-                    end if
+                    ! end if
 
                     if (model_eqns == 4) then
                         lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
@@ -1273,22 +1275,24 @@ contains
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                        if (elasticity) then
-                            call s_compute_pressure( &
-                                q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                                q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                dyn_p, pi_inf, gamma, rho, qv, &
-                                rhoYks, &
-                                pres, &
-                                T, &
-                                q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
-                                q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
-                        else
-                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
-                                                    q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                                    dyn_p, pi_inf, gamma, rho, qv, &
-                                                    rhoYks, pres, T)
-                        end if
+                        ! if (elasticity) then
+                        !     call s_compute_pressure( &
+                        !         q_cons_vf(1)%sf(j - 2, k - 2, l), &
+                        !         q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                        !         dyn_p, pi_inf, gamma, rho, qv, &
+                        !         rhoYks, &
+                        !         pres, &
+                        !         T, &
+                        !         q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
+                        !         q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
+                        ! else
+                        !     call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
+                        !                             q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                        !                             dyn_p, pi_inf, gamma, rho, qv, &
+                        !                             rhoYks, pres, T)
+                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), 0._wp, &
+                                dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T)
+                        ! end if
 
                         if (model_eqns == 4) then
                             lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
@@ -1421,126 +1425,7 @@ contains
                 end if
             end if
             if (proc_rank == 0) then
-                if (n == 0) then
-                    if (bubbles_euler .and. (num_fluids <= 2)) then
-                        if (qbmm) then
-                            write (i + 30, '(6x,f12.6,14f28.16)') &
-                                nondim_time, &
-                                rho, &
-                                vel(1), &
-                                pres, &
-                                alf, &
-                                R(1), &
-                                Rdot(1), &
-                                nR(1), &
-                                nRdot(1), &
-                                varR, &
-                                varV, &
-                                M10, &
-                                M01, &
-                                M20, &
-                                M02
-                        else
-                            write (i + 30, '(6x,f12.6,8f24.8)') &
-                                nondim_time, &
-                                rho, &
-                                vel(1), &
-                                pres, &
-                                alf, &
-                                R(1), &
-                                Rdot(1), &
-                                nR(1), &
-                                nRdot(1)
-                            ! ptilde, &
-                            ! ptot
-                        end if
-                    else if (bubbles_euler .and. (num_fluids == 3)) then
-                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,'// &
-                               'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            pres, &
-                            alf, &
-                            alfgr, &
-                            nR(1), &
-                            nRdot(1), &
-                            R(1), &
-                            Rdot(1), &
-                            ptilde, &
-                            ptot
-                    else if (bubbles_euler .and. num_fluids == 4) then
-                        write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,'// &
-                               'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
-                            nondim_time, &
-                            q_cons_vf(1)%sf(j - 2, 0, 0), &
-                            q_cons_vf(2)%sf(j - 2, 0, 0), &
-                            q_cons_vf(3)%sf(j - 2, 0, 0), &
-                            q_cons_vf(4)%sf(j - 2, 0, 0), &
-                            q_cons_vf(5)%sf(j - 2, 0, 0), &
-                            q_cons_vf(6)%sf(j - 2, 0, 0), &
-                            q_cons_vf(7)%sf(j - 2, 0, 0), &
-                            q_cons_vf(8)%sf(j - 2, 0, 0), &
-                            q_cons_vf(9)%sf(j - 2, 0, 0), &
-                            q_cons_vf(10)%sf(j - 2, 0, 0), &
-                            nbub, &
-                            R(1), &
-                            Rdot(1)
-                    else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            pres
-                    end if
-                elseif (p == 0) then
-                    if (bubbles_euler) then
-                        write (i + 30, '(6X,10F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            vel(2), &
-                            pres, &
-                            alf, &
-                            nR(1), &
-                            nRdot(1), &
-                            R(1), &
-                            Rdot(1)
-                    else if (elasticity) then
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                               'F24.8,F24.8,F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            vel(2), &
-                            pres, &
-                            tau_e(1), &
-                            tau_e(2), &
-                            tau_e(3)
-                    else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            pres
-                        print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
-                    end if
-                else
-                    write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8)') &
-                        nondim_time, &
-                        rho, &
-                        vel(1), &
-                        vel(2), &
-                        vel(3), &
-                        pres, &
-                        gamma, &
-                        pi_inf, &
-                        qv, &
-                        c, &
-                        accel
-                end if
+                write (i + 30, '(F24.8)') pres
             end if
         end do
 

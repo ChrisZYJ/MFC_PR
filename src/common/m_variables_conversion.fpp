@@ -426,21 +426,21 @@ contains
             pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
             qv = qv + alpha_rho_K(i)*qvs(i)
         end do
-#ifdef MFC_SIMULATION
-        ! Computing the shear and bulk Reynolds numbers from species analogs
-        do i = 1, 2
+! #ifdef MFC_SIMULATION
+!         ! Computing the shear and bulk Reynolds numbers from species analogs
+!         do i = 1, 2
 
-            Re_K(i) = dflt_real; if (Re_size(i) > 0) Re_K(i) = 0._wp
+!             Re_K(i) = dflt_real; if (Re_size(i) > 0) Re_K(i) = 0._wp
 
-            do j = 1, Re_size(i)
-                Re_K(i) = alpha_K(Re_idx(i, j))/fluid_pp(Re_idx(i, j))%Re(i) &
-                          + Re_K(i)
-            end do
+!             do j = 1, Re_size(i)
+!                 Re_K(i) = alpha_K(Re_idx(i, j))/fluid_pp(Re_idx(i, j))%Re(i) &
+!                           + Re_K(i)
+!             end do
 
-            Re_K(i) = 1._wp/max(Re_K(i), sgm_eps)
+!             Re_K(i) = 1._wp/max(Re_K(i), sgm_eps)
 
-        end do
-#endif
+!         end do
+! #endif
 
         if (present(G_K)) then
             G_K = 0._wp
