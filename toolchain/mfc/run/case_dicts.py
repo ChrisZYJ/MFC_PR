@@ -247,6 +247,9 @@ SIMULATION.update({
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
+    'tau_star': ParamType.REAL,
+    'cont_damage_s': ParamType.REAL,
+    'alpha_bar': ParamType.REAL,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

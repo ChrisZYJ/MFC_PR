@@ -469,6 +469,14 @@ module m_global_parameters
     !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
     !> @}
 
+    !> @name Continuum damage model parameters
+    !> @{!
+    real(wp) :: tau_star        !< Stress threshold for continuum damage modeling
+    real(wp) :: cont_damage_s   !< Exponent s for continuum damage modeling
+    real(wp) :: alpha_bar       !< Damage rate factor for continuum damage modeling
+    !$acc declare create(tau_star, cont_damage_s, alpha_bar)
+    !> @}
+
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -724,6 +732,11 @@ contains
         rkck_time_tmp = dflt_real
         rkck_tolerance = dflt_real
         dt_max = dflt_real
+
+        ! Continuum damage model
+        tau_star = dflt_real
+        cont_damage_s = dflt_real
+        alpha_bar = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 

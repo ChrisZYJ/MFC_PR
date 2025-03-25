@@ -364,21 +364,11 @@ contains
         real(wp) :: I1, I2, I3, argument, phi, sqrt_term
         integer :: q, l, k
 
-        ! Hard-coded for now
-        real(wp) :: tau_s, s, alpha_bar ! tau_star, s, alpha_bar; constant model parameters determined empirically
-
-        tau_s = 0.0_wp
-        s = 2.0_wp
-        alpha_bar = 1e-4_wp
-
         if (n == 0) then
             l = 0; q = 0
             !$acc parallel loop collapse(1) gang vector default(present)
             do k = 0, m
-                rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_s, 0._wp))**s
-! #ifdef MFC_DEBUG
-!                 print *, q_cons_vf(stress_idx%beg)%sf(k, l, q), rhs_vf(damage_idx)%sf(k, l, q)
-! #:endif
+                rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
             end do
         elseif (p == 0) then
             q = 0
@@ -392,7 +382,7 @@ contains
                                   q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2 + &
                                  4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2)/2._wp
 
-                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_s, 0._wp))**s
+                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                 end do
             end do
         else
@@ -423,7 +413,7 @@ contains
                         sqrt_term = sqrt(max(I1**2 - 3.0_wp*I2, 0.0_wp))
                         tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term*cos(phi/3.0_wp)
 
-                        rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_s, 0._wp))**s
+                        rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                     end do
                 end do
             end do
