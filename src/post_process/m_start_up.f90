@@ -72,7 +72,7 @@ contains
             hypoelasticity, G, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
-            E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
+            E_wrt, tau_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
             cons_vars_wrt, prim_vars_wrt, c_wrt, &
             omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
@@ -353,24 +353,22 @@ contains
         end if
 
         ! Adding the elastic shear stresses to the formatted database file
-        if (elasticity) then
+        if (tau_wrt .or. prim_vars_wrt) then
             do i = 1, stress_idx%end - stress_idx%beg + 1
-                if (prim_vars_wrt) then
-                    q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-                    write (varname, '(A,I0)') 'tau', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                q_sf = q_prim_vf(i - 1 + stress_idx%beg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                write (varname, '(A,I0)') 'tau', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
                 varname(:) = ' '
             end do
         end if
 
-        if (hyperelasticity) then
+        if ((tau_wrt .or. prim_vars_wrt) .and. hyperelasticity) then
             do i = 1, xiend - xibeg + 1
-                if (prim_vars_wrt) then
-                    q_sf = q_prim_vf(i - 1 + xibeg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-                    write (varname, '(A,I0)') 'xi', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                end if
+                q_sf = q_prim_vf(i - 1 + xibeg)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                write (varname, '(A,I0)') 'xi', i
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+
                 varname(:) = ' '
             end do
         end if

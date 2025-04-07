@@ -3,6 +3,7 @@
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
+    real(wp) :: alpha1, alpha2, alpha_rho1, alpha_rho2, y0, theta, f
 
     eps = 1e-9_wp
 
@@ -127,6 +128,128 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
             q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
+        end if
+
+    case (281) ! Triangle Pointing Left
+        alpha1 = 1.E-08
+        alpha2 = 1-1.E-08
+        alpha_rho1 = 1100*1.E-08
+        alpha_rho2 = 1100*(1-1.E-08)
+
+        ! fluid 1 if below the line y = 0.5*(x-0.04) and above the line y = -0.5*(x-0.04)
+        if (y_cc(j) < 0.5*(x_cc(i)-0.04) .and. y_cc(j) > -0.5*(x_cc(i)-0.04)) then
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha1
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha2
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho1
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho2
+        else
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha2
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha1
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho2
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho1
+        end if
+
+    case (282) ! Triangle Pointing Right
+        alpha1 = 1.E-08
+        alpha2 = 1-1.E-08
+        alpha_rho1 = 1100*1.E-08
+        alpha_rho2 = 1100*(1-1.E-08)
+
+        ! fluid 1 if below the line y = -0.5*(x-0.06) and above the line y = 0.5*(x-0.06)
+        if (y_cc(j) < -0.5*(x_cc(i)-0.06) .and. y_cc(j) > 0.5*(x_cc(i)-0.06)) then
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha1
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha2
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho1
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho2
+        else
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha2
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha1
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho2
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho1
+        end if
+
+    case (283) ! Parabola (right) with focal point at (0.05, 0)
+        alpha1 = 1.E-08
+        alpha2 = 1-1.E-08
+        alpha_rho1 = 1100*1.E-08
+        alpha_rho2 = 1100*(1-1.E-08)
+
+        ! fluid 1 if right of the parabola x = 0.05 + (y0**2 - y_cc(j)**2)/(2.0*y0)
+        ! where +-y0 are the y-intercepts
+        y0 = 0.02
+        if (x_cc(i) > 0.05 + (y0**2 - y_cc(j)**2)/(2.0*y0)) then
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha1
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha2
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho1
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho2
+        else
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha2
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha1
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho2
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho1
+        end if
+
+    case (284) ! Bouba-like Shape
+        ! Define fluid properties for two fluids
+        alpha1 = 1.E-08
+        alpha2 = 1-1.E-08
+        alpha_rho1 = 1100*1.E-08
+        alpha_rho2 = 1100*(1-1.E-08)
+
+        ! Calculate polar angle theta using arctan2 for correct quadrant
+        theta = atan2(y_cc(j), x_cc(i)-0.05)
+
+        ! Compute the implicit function F(x, y) for the bouba shape
+        F = sqrt((x_cc(i)-0.05)**2 + y_cc(j)**2) / 0.01 - &
+            (1.0 + 0.3 * cos(5.0 * theta + 0.0) + &
+             0.15 * cos(7.0 * theta + pi/3) + &
+             0.25 * cos(11.0 * theta + pi/2))
+
+        ! Determine if the point is inside or outside the bouba shape
+        if (F < 0.0) then
+            ! Inside the bouba shape: Assign Fluid 1 properties
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha1
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha2
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho1
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho2
+        else
+            ! Outside the bouba shape: Assign Fluid 2 properties
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha2
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha1
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho2
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho1
+        end if
+
+    case (285) ! Bouba-like Shape (more round and off-centered)
+        ! Define fluid properties for two fluids
+        alpha1 = 1.E-08
+        alpha2 = 1-1.E-08
+        alpha_rho1 = 1100*1.E-08
+        alpha_rho2 = 1100*(1-1.E-08)
+
+        ! Calculate polar angle theta using arctan2 for correct quadrant
+        theta = atan2((y_cc(j)), x_cc(i)-0.05)
+
+        ! Compute the implicit function F(x, y) for the bouba shape
+        F = sqrt((x_cc(i)-0.05)**2 + y_cc(j)**2) / 0.01 - &
+            (1.0 + 0.1 * cos(5.0 * theta + 0.0) + &
+             0.02 * cos(7.0 * theta + pi/3) + &
+             0.05 * cos(11.0 * theta + pi/2) + &
+             0.8 * cos(theta - pi/10))
+
+        ! Determine if the point is inside or outside the bouba shape
+        if (F < 0.0) then
+            ! Inside the bouba shape: Assign Fluid 1 properties
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha1
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha2
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho1
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho2
+        else
+            ! Outside the bouba shape: Assign Fluid 2 properties
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha2
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha1
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho2
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho1
         end if
 
     case default
