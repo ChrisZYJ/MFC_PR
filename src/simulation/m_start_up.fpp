@@ -24,6 +24,8 @@ module m_start_up
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_mpi_common
+
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
@@ -81,6 +83,8 @@ module m_start_up
 
     use m_body_forces
 
+    use m_mhd
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -125,7 +129,7 @@ contains
     subroutine s_read_input_file
 
         ! Relative path to the input file provided by the user
-        character(LEN=name_len) :: file_path = './simulation.inp'
+        character(LEN=name_len), parameter :: file_path = './simulation.inp'
 
         logical :: file_exist !<
             !! Logical used to check the existence of the input file
@@ -154,7 +158,7 @@ contains
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, mhd, relativity, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -171,7 +175,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref
+            hyperelasticity, R0ref, Bx0, powell
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -645,7 +649,7 @@ contains
                                            mpi_p, status, ierr)
                     end do
                 end if
-                
+
 
                 call s_mpi_barrier()
 
@@ -665,7 +669,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size * num_ibs, &
+                        call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
                                            MPI_INTEGER, status, ierr)
 
                     else
@@ -834,7 +838,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size, &
+                        call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
                                            mpi_p, status, ierr)
 
                     else
@@ -1165,6 +1169,10 @@ contains
 
         real(wp), dimension(num_species) :: rhoYks
 
+        real(wp) :: pres_mag
+
+        pres_mag = 0._wp
+
         T = dflt_T_guess
 
         do j = 0, m
@@ -1185,9 +1193,16 @@ contains
                         end do
                     end if
 
+                    if (mhd) then
+                        if (n == 0) then
+                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2)
+                        else
+                            pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg+1)%sf(j, k, l)**2 + v_vf(B_idx%beg+2)%sf(j, k, l)**2)
+                        end if
+                    end if
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._wp, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                            dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag = pres_mag)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
@@ -1282,7 +1297,7 @@ contains
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         elseif (time_stepper == 4) then
-            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)         
+            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)
             call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
@@ -1291,7 +1306,7 @@ contains
         ! Time-stepping loop controls
 
         t_step = t_step + 1
-        
+
     end subroutine s_perform_time_step
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
@@ -1396,7 +1411,7 @@ contains
             !$acc update host(q_beta%vf(1)%sf)
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
             !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
-            call s_write_restart_lag_bubbles(save_count) !parallel 
+            call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
@@ -1440,6 +1455,8 @@ contains
         call acc_present_dump()
 #endif
 
+
+        call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
@@ -1509,6 +1526,8 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
+
+        if (mhd .and. powell) call s_initialize_mhd_powell_module
 
     end subroutine s_initialize_modules
 
@@ -1604,7 +1623,7 @@ contains
         !$acc update device(sigma, surface_tension)
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
-   
+
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
@@ -1621,14 +1640,13 @@ contains
         if (ib) then
             !$acc update device(ib_markers%sf)
         end if
-
     end subroutine s_initialize_gpu_vars
 
     subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()
-        if (hypoelasticity) call s_finalize_hypoelastic_module() 
-        if (hyperelasticity) call s_finalize_hyperelastic_module() 
+        if (hypoelasticity) call s_finalize_hypoelastic_module()
+        if (hyperelasticity) call s_finalize_hyperelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
@@ -1637,16 +1655,18 @@ contains
         call s_finalize_weno_module()
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
+        call s_finalize_mpi_common_module()
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
-        if (bubbles_lagrange) call s_finalize_lagrangian_solver() 
+        if (bubbles_lagrange) call s_finalize_lagrangian_solver()
         if (viscous) then
             call s_finalize_viscous_module()
         end if
 
         if (surface_tension)  call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
+        if (mhd .and. powell) call s_finalize_mhd_powell_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

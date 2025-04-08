@@ -4,6 +4,7 @@
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: alpha1, alpha2, alpha_rho1, alpha_rho2, y0, theta, f
+    real(wp) :: factor
 
     eps = 1e-9_wp
 
@@ -101,8 +102,8 @@
         end if
 
     case (205) ! 2D lung wave interaction problem
-        h = 0.0           !non dim origin y
-        lam = 1.0         !non dim lambda
+        h = 0.0_wp           !non dim origin y
+        lam = 1.0_wp         !non dim lambda
         amp = patch_icpp(patch_id)%a(2)         !to be changed later!       !non dim amplitude
 
         intH = amp*sin(2*pi*x_cc(i)/lam - pi/2) + h
@@ -116,8 +117,8 @@
         end if
 
     case (206) ! 2D lung wave interaction problem - horizontal domain
-        h = 0.0           !non dim origin y
-        lam = 1.0         !non dim lambda
+        h = 0.0_wp           !non dim origin y
+        lam = 1.0_wp         !non dim lambda
         amp = patch_icpp(patch_id)%a(2)
 
         intL = amp*sin(2*pi*y_cc(j)/lam - pi/2) + h
@@ -250,6 +251,34 @@
             q_prim_vf(advxe)%sf(i, j, 0) = alpha1
             q_prim_vf(contxb)%sf(i, j, 0) = alpha_rho2
             q_prim_vf(contxe)%sf(i, j, 0) = alpha_rho1
+        end if
+
+    case (250) ! MHD Orszag-Tang vortex
+        ! gamma = 5/3
+        !   rho = 25/(36*pi)
+        !     p = 5/(12*pi)
+        !     v = (-sin(2*pi*y), sin(2*pi*x), 0)
+        !     B = (-sin(2*pi*y)/sqrt(4*pi), sin(4*pi*x)/sqrt(4*pi), 0)
+
+        q_prim_vf(momxb)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))
+        q_prim_vf(momxb + 1)%sf(i, j, 0) = sin(2._wp*pi*x_cc(i))
+
+        q_prim_vf(B_idx%beg)%sf(i, j, 0) = -sin(2._wp*pi*y_cc(j))/sqrt(4._wp*pi)
+        q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = sin(4._wp*pi*x_cc(i))/sqrt(4._wp*pi)
+
+    case (251) ! RMHD Cylindrical Blast Wave [Mignone, 2006: Section 4.3.1]
+
+        if (x_cc(i)**2 + y_cc(j)**2 < 0.08_wp**2) then
+            q_prim_vf(contxb)%sf(i, j, 0) = 0.01
+            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0
+        elseif (x_cc(i)**2 + y_cc(j)**2 <= 1._wp**2) then
+            ! Linear interpolation between r=0.08 and r=1.0
+            factor = (1.0_wp - sqrt(x_cc(i)**2 + y_cc(j)**2))/(1.0_wp - 0.08_wp)
+            q_prim_vf(contxb)%sf(i, j, 0) = 0.01_wp*factor + 1.e-4_wp*(1.0_wp - factor)
+            q_prim_vf(E_idx)%sf(i, j, 0) = 1.0_wp*factor + 3.e-5_wp*(1.0_wp - factor)
+        else
+            q_prim_vf(contxb)%sf(i, j, 0) = 1.e-4_wp
+            q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
         end if
 
     case default

@@ -59,6 +59,8 @@ module m_rhs
 
     use m_chemistry
 
+    use m_mhd
+
     implicit none
 
     private; public :: s_initialize_rhs_module, &
@@ -203,9 +205,14 @@ contains
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
         do l = 1, cont_idx%end
-            q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-            !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            if (relativity) then
+                ! Cons and Prim densities are different for relativity
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            else
+                q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+                !$acc enter data copyin(q_prim_qp%vf(l)%sf)
+                !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            end if
         end do
 
         do l = adv_idx%beg, adv_idx%end
@@ -510,7 +517,7 @@ contains
                          & idwbuff(2)%beg:idwbuff(2)%end, &
                          & idwbuff(3)%beg:idwbuff(3)%end))
 
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -540,7 +547,7 @@ contains
             @:ACC_SETUP_VFs(flux_n(i), flux_src_n(i), flux_gsrc_n(i))
 
             if (i == 1) then
-                if (riemann_solver /= 1) then
+                if (riemann_solver /= 1 .and. riemann_solver /= 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
@@ -585,9 +592,9 @@ contains
         !$acc parallel loop collapse(4) gang vector default(present)
         do id = 1, num_dims
             do i = 1, sys_size
-                do l = startz, p - startz
-                    do k = starty, n - starty
-                        do j = startx, m - startx
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
                             flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
                         end do
                     end do
@@ -607,8 +614,8 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
 
@@ -774,10 +781,8 @@ contains
             end if
             irx%end = m; iry%end = n; irz%end = p
 
-            call nvtxStartRange("RHS-RIEMANN-SOLVER")
-
             ! Computing Riemann Solver Flux and Source Flux
-            call nvtxStartRange("RHS_riemann_solver")
+            call nvtxStartRange("RHS-RIEMANN-SOLVER")
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -848,6 +853,10 @@ contains
                 call nvtxEndRange
             end if
             ! END: Additional physics and source terms
+
+            call nvtxStartRange("RHS-MHD")
+            if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
+            call nvtxEndRange
 
         end do
         ! END: Dimensional Splitting Loop
@@ -999,7 +1008,7 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do q = 0, p
@@ -1143,7 +1152,7 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == 1 .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do l = 0, p
@@ -1409,7 +1418,7 @@ contains
                     end if
                 end if
             else
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do k = 0, p
@@ -1973,8 +1982,8 @@ contains
                                                   norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
@@ -2025,8 +2034,8 @@ contains
                                                               norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
@@ -2102,8 +2111,14 @@ contains
         integer :: i, j, l
 
         do j = cont_idx%beg, cont_idx%end
-            !$acc exit data detach(q_prim_qp%vf(j)%sf)
-            nullify (q_prim_qp%vf(j)%sf)
+            if (relativity) then
+                ! Cons and Prim densities are different for relativity
+                @:DEALLOCATE(q_cons_qp%vf(j)%sf)
+                @:DEALLOCATE(q_prim_qp%vf(j)%sf)
+            else
+                !$acc exit data detach(q_prim_qp%vf(j)%sf)
+                nullify (q_prim_qp%vf(j)%sf)
+            end if
         end do
 
         do j = adv_idx%beg, adv_idx%end
@@ -2221,7 +2236,7 @@ contains
                     end do
                 end if
 
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do

@@ -251,6 +251,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
         cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
+        cases.append(define_case_d(stack, "HLL", {'riemann_solver': 1}))
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
@@ -318,44 +319,53 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         else:
             cases.append(define_case_d(stack, '2 MPI Ranks', {}, ppn=2))
 
+
     def alter_ib(dimInfo, six_eqn_model=False):
-        stack.push(f'IBM', {
-            'ib': 'T', 'num_ibs': 1,
-            'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5,
-            'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
-            'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
-        })
+        for slip in [True, False]:
+            stack.push(f'IBM', {
+                'ib': 'T', 'num_ibs': 1,
+                'patch_ib(1)%x_centroid': 0.5, 'patch_ib(1)%y_centroid': 0.5,
+                'patch_ib(1)%radius': 0.1, 'patch_icpp(1)%vel(1)': 0.001,
+                'patch_icpp(2)%vel(1)': 0.001, 'patch_icpp(3)%vel(1)': 0.001,
+                'patch_ib(1)%slip': 'T' if slip else 'F',
+            })
 
-        if len(dimInfo[0]) == 3:
-            cases.append(define_case_d(stack, f'Sphere', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%geometry': 8,
-            }))
+            suffix = " -> slip" if slip else ""
 
-            cases.append(define_case_d(stack, f'Cuboid', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%length_x': 0.1,
-                'patch_ib(1)%length_y': 0.1,
-                'patch_ib(1)%length_z': 0.1,
-                'patch_ib(1)%geometry': 9,
-            }))
+            if len(dimInfo[0]) == 3:
+                cases.append(define_case_d(stack, f'Sphere{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%geometry': 8,
+                }))
 
-            cases.append(define_case_d(stack, f'Cylinder', {
-                'patch_ib(1)%z_centroid': 0.5,
-                'patch_ib(1)%length_x': 0.1,
-                'patch_ib(1)%geometry': 10,
-            }))
+                cases.append(define_case_d(stack, f'Cuboid{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%length_x': 0.1,
+                    'patch_ib(1)%length_y': 0.1,
+                    'patch_ib(1)%length_z': 0.1,
+                    'patch_ib(1)%geometry': 9,
+                }))
 
-        elif len(dimInfo[0]) == 2:
-            cases.append(define_case_d(stack, f'Rectangle', {
-                'patch_ib(1)%length_x': 0.05,
-                'patch_ib(1)%length_y': 0.05,
-                'patch_ib(1)%geometry': 3 }))
-            cases.append(define_case_d(stack, f'Circle', {'patch_ib(1)%geometry': 2 }))
-            if six_eqn_model:
-                cases.append(define_case_d(stack, f'model_eqns=3', {'patch_ib(1)%geometry': 2, 'model_eqns': 3}))
+                cases.append(define_case_d(stack, f'Cylinder{suffix}', {
+                    'patch_ib(1)%z_centroid': 0.5,
+                    'patch_ib(1)%length_x': 0.1,
+                    'patch_ib(1)%geometry': 10,
+                }))
 
-        stack.pop()
+            elif len(dimInfo[0]) == 2:
+                cases.append(define_case_d(stack, f'Rectangle{suffix}', {
+                    'patch_ib(1)%length_x': 0.05,
+                    'patch_ib(1)%length_y': 0.05,
+                    'patch_ib(1)%geometry': 3,
+                }))
+                cases.append(define_case_d(stack, f'Circle{suffix}', {'patch_ib(1)%geometry': 2 }))
+                if six_eqn_model:
+                    cases.append(define_case_d(stack, f'model_eqns=3{suffix}', {
+                        'patch_ib(1)%geometry': 2,
+                        'model_eqns': 3,
+                    }))
+
+            stack.pop()
 
     def ibm_stl():
         common_mods = {
@@ -561,6 +571,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 })
 
             cases.append(define_case_d(stack, '', {}))
+
+            reflective_params = {'bc_x%beg': -2, 'bc_x%end': -2, 'bc_y%beg': -2, 'bc_y%end': -2}
+            if len(dimInfo[0]) == 3:
+                reflective_params.update({'bc_z%beg': -2, 'bc_z%end': -2})
+
+            if num_fluids == 1:
+                if len(dimInfo[0]) >= 2:
+                    cases.append(define_case_d(stack, 'bc=-2', reflective_params))
+                if len(dimInfo[0]) == 2:
+                    cases.append(define_case_d(stack, 'Axisymmetric', {**reflective_params, 'cyl_coord': 'T'}))
 
             stack.pop()
 
@@ -817,6 +837,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
+    def alter_elliptic_smoothing():
+        # Elliptic Smoothing
+
+        stack.push("Smoothing",{
+                'elliptic_smoothing': 'T', 'elliptic_smoothing_iters': 10
+            })
+
+        cases.append(define_case_d(stack, '', {}))
+
+        stack.pop()
+
+    def mhd_cases():
+        params = {
+            '1D': {"m": 200, "dt": 0.001, "t_step_stop": 200, "t_step_save": 200},
+            '2D': {"m": 50, "n": 50, "dt": 0.002, "t_step_stop": 500, "t_step_save": 500},
+            '3D': {"m": 25, "n": 25, "p": 25, "dt": 0.005, "t_step_stop": 200, "t_step_save": 200},
+        }
+
+        case_specs = [
+            ("1D -> MHD -> HLL",    "examples/1D_brio_wu/case.py",              params['1D']),
+            ("1D -> MHD -> HLLD",   "examples/1D_brio_wu_hlld/case.py",         params['1D']),
+            ("1D -> RMHD",          "examples/1D_brio_wu_rmhd/case.py",         params['1D']),
+            ("2D -> MHD -> HLL",    "examples/2D_orszag_tang/case.py",          params['2D']),
+            ("2D -> MHD -> HLLD",   "examples/2D_orszag_tang/case.py",          {**params['2D'], 'riemann_solver': 4}),
+            ("2D -> MHD -> Powell", "examples/2D_orszag_tang_powell/case.py",   params['2D']),
+            ("2D -> RMHD",          "examples/2D_shock_cloud_rmhd/case.py",     params['2D']),
+            ("3D -> MHD",           "examples/3D_brio_wu/case.py",              params['3D']),
+            ("3D -> RMHD",          "examples/3D_brio_wu/case.py",              {**params['3D'], 'relativity': 'T'}),
+        ]
+
+        for name, path, param in case_specs:
+            cases.append(define_case_f(name, path, mods=param))
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
@@ -837,6 +889,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_hypoelasticity(dimInfo)
             alter_phasechange(dimInfo)
             alter_viscosity(dimInfo)
+            alter_elliptic_smoothing()
             alter_body_forces(dimInfo)
             alter_instability_wave(dimInfo)
             stack.pop()
@@ -904,6 +957,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ))
 
     foreach_dimension()
+
+    mhd_cases()
 
     foreach_example()
 

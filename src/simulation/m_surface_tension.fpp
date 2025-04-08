@@ -70,7 +70,7 @@ contains
                                               flux_src_vf, &
                                               id, isx, isy, isz)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf !> unused so unsure what intent to give it
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsx_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsy_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in) :: vSrc_rsz_vf
@@ -303,8 +303,8 @@ contains
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
 
-        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
-        real(wp), dimension(startx:, starty:, startz:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction

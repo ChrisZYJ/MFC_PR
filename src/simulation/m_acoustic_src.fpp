@@ -111,7 +111,7 @@ contains
         !$acc update device(loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq)
 
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
-        @:ALLOCATE(mom_src(1:num_dims, 0:m, 0:n, 0:p))
+        @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
         @:ALLOCATE(E_src(0:m, 0:n, 0:p))
 
     end subroutine s_initialize_acoustic_src
@@ -329,7 +329,7 @@ contains
                 end do
             end do
         end do
-    end subroutine
+    end subroutine s_acoustic_src_calculations
 
     !> This subroutine gives the temporally varying amplitude of the pulse
     !! @param sim_time Simulation time
@@ -487,7 +487,7 @@ contains
         end do
 #endif
 
-    end subroutine
+    end subroutine s_precalculate_acoustic_spatial_sources
 
     !> This subroutine gives the spatial support of the acoustic source
     !! @param j x-index

@@ -22,6 +22,7 @@ class ParamType(Enum):
         return self.STR
 
 COMMON = {
+    'mhd': ParamType.LOG,
     'hypoelasticity': ParamType.LOG,
     'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
@@ -57,6 +58,8 @@ COMMON = {
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
     'rkck_adap_dt': ParamType.LOG, 
+    'Bx0': ParamType.REAL,
+    'relativity': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -92,6 +95,8 @@ PRE_PROCESS.update({
     'n_start': ParamType.INT,
     'n_start_old': ParamType.INT,
     'surface_tension': ParamType.LOG,
+    'elliptic_smoothing': ParamType.LOG,
+    'elliptic_smoothing_iters': ParamType.INT,
 })
 
 for ib_id in range(1, 10+1):
@@ -147,6 +152,10 @@ for p_id in range(1, 10+1):
         PRE_PROCESS[f"patch_icpp({p_id})%a({real_attr})"] = ParamType.REAL
 
     PRE_PROCESS[f"patch_icpp({p_id})%pres"] = ParamType.REAL.analytic()
+
+    PRE_PROCESS[f"patch_icpp({p_id})%Bx"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%By"] = ParamType.REAL.analytic()
+    PRE_PROCESS[f"patch_icpp({p_id})%Bz"] = ParamType.REAL.analytic()
 
     for i in range(100):
         PRE_PROCESS[f"patch_icpp({p_id})%Y({i})"] = ParamType.REAL.analytic()
@@ -246,6 +255,7 @@ SIMULATION.update({
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
+    'powell': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -308,7 +318,7 @@ for cmp in ["x", "y", "z"]:
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL
 
-for probe_id in range(1,3+1):
+for probe_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:
         SIMULATION[f'probe({probe_id})%{cmp}'] = ParamType.REAL
 
@@ -421,7 +431,7 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", "num_fluids" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order", "num_fluids", "mhd", "relativity" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 

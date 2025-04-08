@@ -417,8 +417,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_n_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
 
         integer :: i, j, k, l, q
 
@@ -675,7 +675,7 @@ contains
 
         end if
 
-    end subroutine
+    end subroutine s_compute_qbmm_rhs
 
 !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
 
@@ -820,10 +820,10 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(:), intent(inout) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(inout) :: moms3d
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        real(wp), dimension(startx:, starty:, startz:) :: nbub_sc !> Unused Variable not sure what to put as intent
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: nbub_sc
 
         real(wp), dimension(nmom) :: moms, msum
         real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht

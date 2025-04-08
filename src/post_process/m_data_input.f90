@@ -37,6 +37,8 @@ module m_data_input
         !!  @param t_step Current time-step to input
         subroutine s_read_abstract_data_files(t_step)
 
+            implicit none
+
             integer, intent(in) :: t_step
 
         end subroutine s_read_abstract_data_files
@@ -396,7 +398,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 ! Read the data for each variable
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. elasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 

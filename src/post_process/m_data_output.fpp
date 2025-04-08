@@ -50,6 +50,7 @@ module m_data_output
     real(wp), allocatable, dimension(:, :, :), public :: q_sf
     real(wp), allocatable, dimension(:, :, :) :: q_root_sf
     real(wp), allocatable, dimension(:, :, :) :: cyl_q_sf
+
     ! Single precision storage for flow variables
     real(sp), allocatable, dimension(:, :, :), public :: q_sf_s
     real(sp), allocatable, dimension(:, :, :) :: q_root_sf_s
@@ -219,10 +220,6 @@ contains
 
             file_loc = trim(proc_rank_dir)//'/.'
 
-            !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-            !EXIST     = dir_check       )
-            ! INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-            !           EXIST     = dir_check       )
             call my_inquire(file_loc, dir_check)
             if (dir_check .neqv. .true.) then
                 call s_create_directory(trim(proc_rank_dir))
@@ -235,10 +232,6 @@ contains
 
                 file_loc = trim(rootdir)//'/.'
 
-                !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                !        EXIST     = dir_check       )
-                !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                !           EXIST     = dir_check       )
                 call my_inquire(file_loc, dir_check)
                 if (dir_check .neqv. .true.) then
                     call s_create_directory(trim(rootdir))
@@ -259,10 +252,6 @@ contains
 
             file_loc = trim(proc_rank_dir)//'/.'
 
-            !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-            !       EXIST     = dir_check       )
-            !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-            !           EXIST     = dir_check       )
             call my_inquire(file_loc, dir_check)
 
             if (dir_check .neqv. .true.) then
@@ -276,10 +265,6 @@ contains
 
                 file_loc = trim(rootdir)//'/.'
 
-                !INQUIRE( DIRECTORY = TRIM(file_loc), & ! Intel compiler
-                !        EXIST     = dir_check       )
-                !  INQUIRE( FILE      = TRIM(file_loc), & ! NAG/PGI/GCC compiler
-                !        EXIST     = dir_check       )
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check .neqv. .true.) then
@@ -329,12 +314,13 @@ contains
             end if
 
             ! Density
-            if (rho_wrt &
-                .or. &
-                (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
-                then
+            if ((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+                .and. (.not. relativity)) then
                 dbvars = dbvars + 1
             end if
+
+            if (relativity .and. (rho_wrt .or. prim_vars_wrt)) dbvars = dbvars + 1
+            if (relativity .and. (rho_wrt .or. cons_vars_wrt)) dbvars = dbvars + 1
 
             ! Momentum
             do i = 1, E_idx - mom_idx%beg
@@ -359,6 +345,15 @@ contains
 
             ! Elastic stresses
             if (tau_wrt .or. prim_vars_wrt) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+
+            ! Magnetic field
+            if (mhd) then
+                if (n == 0) then
+                    dbvars = dbvars + 2
+                else
+                    dbvars = dbvars + 3
+                end if
+            end if
 
             ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
@@ -407,11 +402,11 @@ contains
 
             ! Vorticity
             if (p > 0) then
-                do i = 1, E_idx - mom_idx%beg
+                do i = 1, num_vels
                     if (omega_wrt(i)) dbvars = dbvars + 1
                 end do
             elseif (n > 0) then
-                do i = 1, E_idx - cont_idx%end
+                do i = 1, num_vels
                     if (omega_wrt(i)) dbvars = dbvars + 1
                 end do
             end if
@@ -1291,7 +1286,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
-        real(wp), dimension(num_dims) :: vel
+        real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: gammas, pi_infs, adv
         integer :: i, j, k, l, s !looping indices
         integer :: ierr, counter, root !< number of data points extracted to fit shape to SH perturbations
@@ -1321,7 +1316,7 @@ contains
                     pi_inf = 0_wp
                     pres = q_prim_vf(E_idx)%sf(i, j, k)
                     Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
-                    do s = 1, num_dims
+                    do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                         Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
                         Elk = Elk + 0.5_wp*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV

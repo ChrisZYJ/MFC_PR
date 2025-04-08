@@ -40,7 +40,6 @@ module m_weno
     !! of the characteristic decomposition are stored in custom-constructed WENO-
     !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
-
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
 
@@ -52,17 +51,12 @@ module m_weno
     !! second dimension identifies the position of its coefficients and the last
     !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_z
-
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_y
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbR_z
-
-    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_L => null()
-    !    real(wp), pointer, dimension(:, :, :) :: poly_coef_R => null()
     !> @}
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
@@ -70,7 +64,6 @@ module m_weno
     !! that the first dimension of the array identifies the weight, while the
     !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_z
@@ -78,8 +71,6 @@ module m_weno
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_y
     real(wp), target, allocatable, dimension(:, :) :: d_cbR_z
-!    real(wp), pointer, dimension(:, :) :: d_L => null()
-!    real(wp), pointer, dimension(:, :) :: d_R => null()
     !> @}
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
@@ -87,17 +78,14 @@ module m_weno
     !! second identifies the position of its coefficients and the last denotes
     !! the cell-location in the relevant coordinate direction.
     !> @{
-
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_z
-!    real(wp), pointer, dimension(:, :, :) :: beta_coef => null()
     !> @}
 
     ! END: WENO Coefficients
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
-
     !$acc declare create(v_size)
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
@@ -655,8 +643,8 @@ contains
                       is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in) :: norm_dir
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
@@ -865,9 +853,10 @@ contains
                                         ! Fu, et al. (2016)
                                         ! Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                         tau = abs(beta(2) - beta(0))
-                                        alpha = (1._wp + tau/beta)**6._wp           ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                        alpha = 1._wp + tau/beta                    ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                        alpha = (alpha*alpha*alpha)**2._wp          ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
                                         omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
-                                        delta = merge(0._wp, 1._wp, omega < teno_CT)    ! Equation 26
+                                        delta = merge(0._wp, 1._wp, omega < teno_CT)! Equation 26
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
 
                                     end if
@@ -1048,7 +1037,8 @@ contains
 
                                     elseif (teno) then
                                         tau = abs(beta(4) - beta(3)) ! Note the reordering of stencils
-                                        alpha = (1._wp + tau/beta)**6._wp
+                                        alpha = 1._wp + tau/beta
+                                        alpha = (alpha*alpha*alpha)**2._wp ! some CPU compilers cannot optimize x**6.0
                                         omega = alpha/sum(alpha)
                                         delta = merge(0._wp, 1._wp, omega < teno_CT)
                                         alpha = delta*d_cbL_${XYZ}$ (:, j)
@@ -1247,8 +1237,8 @@ contains
         !!  @param l Thire-coordinate cell index
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(IN) :: v_rs_ws
-        real(wp), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
 
         integer :: i, j, k, l
 
