@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#SBATCH --job-name="EKI2D37M"
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=44
+#SBATCH --time=23:59:00
+#SBATCH --partition="rm"
+#SBATCH --output="EKI2D37M%j.out"
+#SBATCH --error="EKI2D37M%j.err"
+#SBATCH --export=ALL
+#SBATCH --exclusive
+# #SBATCH --mem=250G
+#SBATCH --mem=250G
+
+module purge
+source ~/.bashrc
+module load gcc/9.3.0
+module load openmpi-2.0/gcc-9.3.0
+
+/home/chriszhang/local/python/bin/python3 EKI_2D/test37M/EKI_new.py
