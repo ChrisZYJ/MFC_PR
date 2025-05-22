@@ -151,6 +151,8 @@ module m_rhs
     !> @}
     !$acc declare create(alf_sum)
 
+    logical, allocatable, dimension(:, :, :) :: flux_dir1, flux_dir2
+
     real(wp), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
     real(wp), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
     real(wp), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
@@ -287,6 +289,9 @@ contains
             @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
         ! END: Allocation/Association of qK_cons_n and qK_prim_n
+
+        @:ALLOCATE(flux_dir1(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        @:ALLOCATE(flux_dir2(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
 
         @:ALLOCATE(qL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
             idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
@@ -802,6 +807,7 @@ contains
                                   flux_n(id)%vf, &
                                   flux_src_n(id)%vf, &
                                   flux_gsrc_n(id)%vf, &
+                                  flux_dir1, flux_dir2, &
                                   id, irx, iry, irz)
             call nvtxEndRange
 
@@ -819,7 +825,8 @@ contains
             call nvtxStartRange("RHS-HYPOELASTICITY")
             if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
                                                                q_prim_qp%vf, &
-                                                               rhs_vf)
+                                                               rhs_vf, &
+                                                               flux_dir1, flux_dir2)
             call nvtxEndRange
 
             ! RHS additions for viscosity
@@ -2186,6 +2193,9 @@ contains
             !$acc exit data delete(alf_sum%sf)
             deallocate (alf_sum%sf)
         end if
+
+        deallocate(flux_dir1)
+        deallocate(flux_dir2)
 
         if (viscous) then
             do l = mom_idx%beg, mom_idx%end

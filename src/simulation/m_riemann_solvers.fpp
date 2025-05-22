@@ -157,6 +157,7 @@ contains
                                 q_prim_vf, &
                                 flux_vf, flux_src_vf, &
                                 flux_gsrc_vf, &
+                                flux_dir1, flux_dir2, &
                                 norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -174,11 +175,13 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
+        logical, allocatable, dimension(:,:,:) :: flux_dir1, flux_dir2
+
         integer, intent(IN) :: norm_dir
 
         type(int_bounds_info), intent(IN) :: ix, iy, iz
 
-        #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4)]
+        #:for NAME, NUM in [('hll', 1), ('hlld', 4)]
             if (riemann_solver == ${NUM}$) then
                 call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                                dqL_prim_dy_vf, &
@@ -194,6 +197,22 @@ contains
                                                norm_dir, ix, iy, iz)
             end if
         #:endfor
+
+        if (riemann_solver == 2) then
+            call s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+                                        dqL_prim_dy_vf, &
+                                        dqL_prim_dz_vf, &
+                                        qL_prim_vf, &
+                                        qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                        dqR_prim_dy_vf, &
+                                        dqR_prim_dz_vf, &
+                                        qR_prim_vf, &
+                                        q_prim_vf, &
+                                        flux_vf, flux_src_vf, &
+                                        flux_gsrc_vf, &
+                                        flux_dir1, flux_dir2, &
+                                        norm_dir, ix, iy, iz)
+        end if
 
     end subroutine s_riemann_solver
 
@@ -1185,6 +1204,7 @@ contains
                                      q_prim_vf, &
                                      flux_vf, flux_src_vf, &
                                      flux_gsrc_vf, &
+                                     flux_dir1, flux_dir2, &
                                      norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -1201,6 +1221,8 @@ contains
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+
+        logical, allocatable, dimension(:,:,:) :: flux_dir1, flux_dir2
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
@@ -1264,6 +1286,12 @@ contains
 
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
+
+        ! flux_dir1 = .false.
+        ! print *, size(flux_dir1, 1)
+        ! print *, size(flux_dir1, 2)
+        ! print *, size(flux_dir1, 3)
+        ! flux_dir1(0,0,0) = .true.
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
@@ -2746,6 +2774,9 @@ contains
                                                    (pres_L - pres_R)/ &
                                                    (rho_avg*c_avg))
                                 end if
+
+                                if (norm_dir == 1) flux_dir1(j, k, 0) = (s_S >= 0)
+                                if (norm_dir == 2) flux_dir2(k, j, 0) = (s_S >= 0)
 
                                 ! follows Einfeldt et al.
                                 ! s_M/P = min/max(0.,s_L/R)

@@ -87,11 +87,13 @@ contains
         !!  @param idir Dimension splitting index
         !!  @param q_prim_vf Primitive variables
         !!  @param rhs_vf rhs variables
-    subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
+    subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf, flux_dir1, flux_dir2)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+
+        logical, allocatable, dimension(:,:,:) :: flux_dir1, flux_dir2
 
         real(wp) :: rho_K, G_K
 
@@ -118,11 +120,19 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        !$acc loop seq
-                        do r = -fd_number, fd_number
+                        ! !$acc loop seq
+                        ! do r = -fd_number, fd_number
+                        !     du_dx(k, l, q) = du_dx(k, l, q) &
+                        !                      + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                        ! end do
+
+                        if (flux_dir1(k, l, q)) then
                             du_dx(k, l, q) = du_dx(k, l, q) &
-                                             + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                        end do
+                            + (q_prim_vf(momxb)%sf(k + 1, l, q) - q_prim_vf(momxb)%sf(k, l, q)) / (x_cc(k + 1) - x_cc(k))
+                        else
+                            du_dx(k, l, q) = du_dx(k, l, q) &
+                            + (q_prim_vf(momxb)%sf(k, l, q) - q_prim_vf(momxb)%sf(k - 1, l, q)) / (x_cc(k) - x_cc(k - 1))
+                        end if
 
                     end do
                 end do
@@ -144,15 +154,43 @@ contains
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            !$acc loop seq
-                            do r = -fd_number, fd_number
+                            ! !$acc loop seq
+                            ! do r = -fd_number, fd_number
+                            !     du_dy(k, l, q) = du_dy(k, l, q) &
+                            !                      + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                            !     dv_dx(k, l, q) = dv_dx(k, l, q) &
+                            !                      + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                            !     dv_dy(k, l, q) = dv_dy(k, l, q) &
+                            !                      + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                            ! end do
+
+                            ! du_dy: derivative of u with respect to y, use flux_dir2
+                            if (flux_dir2(k, l, q)) then
                                 du_dy(k, l, q) = du_dy(k, l, q) &
-                                                 + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                                + (q_prim_vf(momxb)%sf(k, l + 1, q) - q_prim_vf(momxb)%sf(k, l, q)) / (y_cc(l + 1) - y_cc(l))
+                            else
+                                du_dy(k, l, q) = du_dy(k, l, q) &
+                                + (q_prim_vf(momxb)%sf(k, l, q) - q_prim_vf(momxb)%sf(k, l - 1, q)) / (y_cc(l) - y_cc(l - 1))
+                            end if
+
+                            ! dv_dx: derivative of v with respect to x, use flux_dir1
+                            if (flux_dir1(k, l, q)) then
                                 dv_dx(k, l, q) = dv_dx(k, l, q) &
-                                                 + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                                + (q_prim_vf(momxb + 1)%sf(k + 1, l, q) - q_prim_vf(momxb + 1)%sf(k, l, q)) / (x_cc(k + 1) - x_cc(k))
+                            else
+                                dv_dx(k, l, q) = dv_dx(k, l, q) &
+                                + (q_prim_vf(momxb + 1)%sf(k, l, q) - q_prim_vf(momxb + 1)%sf(k - 1, l, q)) / (x_cc(k) - x_cc(k - 1))
+                            end if
+
+                            ! dv_dy: derivative of v with respect to y, use flux_dir2
+                            if (flux_dir2(k, l, q)) then
                                 dv_dy(k, l, q) = dv_dy(k, l, q) &
-                                                 + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                            end do
+                                + (q_prim_vf(momxb + 1)%sf(k, l + 1, q) - q_prim_vf(momxb + 1)%sf(k, l, q)) / (y_cc(l + 1) - y_cc(l))
+                            else
+                                dv_dy(k, l, q) = dv_dy(k, l, q) &
+                                + (q_prim_vf(momxb + 1)%sf(k, l, q) - q_prim_vf(momxb + 1)%sf(k, l - 1, q)) / (y_cc(l) - y_cc(l - 1))
+                            end if
+
                         end do
                     end do
                 end do
