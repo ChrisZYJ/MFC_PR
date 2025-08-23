@@ -2243,17 +2243,19 @@ contains
     
         ! Local variables
         integer :: i, j, l
-        real(wp) :: x_centroid, y_centroid, radius
+        real(wp) :: x_centroid, y_centroid, radius, max_radius
         real(wp) :: r_cell, phi, new_radius, perturb, cosTheta
+        real(wp) :: r_from_domain_center
         real(wp), dimension(2:99) :: coeff
         real(wp) :: eta          ! Pseudo volume fraction for patch assignment
         real(wp) :: delta        ! Width of the interpolation band
         ! Assumed to be defined in the module: dx, dy, verysmall
     
-        ! Read patch centroid, radius and the coefficients a(2:99)
+        ! Read patch centroid, radius, a1 (max radius), and the coefficients a(2:99)
         x_centroid   = patch_icpp(patch_id)%x_centroid
         y_centroid   = patch_icpp(patch_id)%y_centroid
         radius       = patch_icpp(patch_id)%radius
+        max_radius   = patch_icpp(patch_id)%a(1)  ! Use a1 as maximum radius
         do l = 2, 99
             coeff(l) = patch_icpp(patch_id)%a(l)
         end do
@@ -2294,7 +2296,16 @@ contains
                 end if
                 
                 new_radius = radius + perturb
-    
+
+                ! Check if the point is outside max_radius from domain center [0.5,0.5]
+                if (.not. f_approx_equal(patch_icpp(patch_id)%a(1), 0._wp)) then
+                    r_from_domain_center = sqrt((x_cc(i) - 0.5_wp)**2 + (y_cc(j) - 0.5_wp)**2)
+                    if (r_from_domain_center > max_radius) then
+                        eta = 0._wp  ! Force eta to zero for points outside max_radius from [0.5,0.5]
+                        cycle        ! Skip to next iteration
+                    end if
+                end if
+
                 ! --- Anti-aliasing (smoothen) using a narrow interpolation band ---
                 ! Only cells within a band of width 2*delta (centered on new_radius)
                 ! are given a fractional (interpolated) value.
