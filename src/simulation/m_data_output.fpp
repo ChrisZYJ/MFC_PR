@@ -1092,6 +1092,8 @@ contains
 
         real(wp) :: rhoYks(1:num_species)
 
+        logical :: is_rightmost, is_topmost
+
         T = dflt_T_guess
 
         ! Non-dimensional time calculation
@@ -1249,8 +1251,23 @@ contains
                     end do
                 end if
 
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
+                ! if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
+                !     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
+
+                ! FIXED CODE:
+                ! Determine if this processor is at the physical domain boundary
+                ! (bc < 0 means physical boundary, bc >= 0 means another processor exists)
+                is_rightmost = (bc_x%end < 0)  ! No processor to the right
+                is_topmost = (bc_y%end < 0)    ! No processor above
+                
+                ! Check probe location with proper boundary ownership:
+                ! - Left/bottom boundaries: always inclusive (>=)
+                ! - Right/top boundaries: exclusive (<) unless at physical domain edge
+                if ((probe(i)%x >= x_cb(-1)) .and. &
+                    ((probe(i)%x < x_cb(m)) .or. (is_rightmost .and. probe(i)%x <= x_cb(m)))) then
+                    if ((probe(i)%y >= y_cb(-1)) .and. &
+                        ((probe(i)%y < y_cb(n)) .or. (is_topmost .and. probe(i)%y <= y_cb(n)))) then
+                        
                         do s = -1, m
                             distx(s) = x_cb(s) - probe(i)%x
                             if (distx(s) < 0._wp) distx(s) = 1000._wp
