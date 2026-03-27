@@ -419,6 +419,24 @@ contains
         ! Calculating the density, the specific heat ratio function, the
         ! liquid stiffness function, and the energy reference function,
         ! respectively, from the species analogs
+#ifndef MFC_SIMULATION
+        ! Pre-processor/post-processor: FMA-invariant accumulation.
+        ! Uses delta-from-reference: gamma = gammas(1) + sum_{i>1} alpha_K(i)*(gammas(i)-gammas(1))
+        ! When all fluids share the same gamma/pi_inf, the difference is exactly zero,
+        ! eliminating FMA-dependent ULP differences that the HLLD hypo solver amplifies.
+        rho = 0._wp; gamma = gammas(1); pi_inf = pi_infs(1); qv = 0._wp
+
+        do i = 1, num_fluids
+            rho = rho + alpha_rho_K(i)
+            qv = qv + alpha_rho_K(i)*qvs(i)
+        end do
+
+        do i = 2, num_fluids
+            gamma = gamma + alpha_K(i)*(gammas(i) - gammas(1))
+            pi_inf = pi_inf + alpha_K(i)*(pi_infs(i) - pi_infs(1))
+        end do
+#else
+        ! Simulation: original accumulation (must not change to preserve bit-identity)
         rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
 
         do i = 1, num_fluids
@@ -427,6 +445,7 @@ contains
             pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
             qv = qv + alpha_rho_K(i)*qvs(i)
         end do
+#endif
 #ifdef MFC_SIMULATION
         ! Computing the shear and bulk Reynolds numbers from species analogs
         do i = 1, 2
@@ -1318,9 +1337,18 @@ contains
                                 + pi_inf + qv
                         elseif ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                             ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
-                            q_cons_vf(E_idx)%sf(j, k, l) = &
-                                gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
-                                + qv
+                            ! Use a volatile intermediate to force gamma*p to be
+                            ! rounded to double precision before adding pi_inf.
+                            ! Without this, FMA contracts gamma*p + pi_inf into a
+                            ! single-rounded operation, giving 1 ULP different E
+                            ! between -O0 and -O3 builds. The HLLD hypoelastic
+                            ! solver amplifies this to O(1e-4) over 250 steps.
+                            block
+                                real(wp), volatile :: gamma_p_vol
+                                gamma_p_vol = gamma*q_prim_vf(E_idx)%sf(j, k, l)
+                                q_cons_vf(E_idx)%sf(j, k, l) = &
+                                    gamma_p_vol + dyn_pres + pi_inf + qv
+                            end block
                         else if ((model_eqns /= 4) .and. (bubbles_euler)) then
                             ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                             q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
