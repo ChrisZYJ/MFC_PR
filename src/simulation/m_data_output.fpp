@@ -1171,8 +1171,8 @@ contains
                             G_local = G_local*max((1._wp - damage_state), 0._wp)
                         end if
 
-                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), dyn_p, &
-                                                & pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
+                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
+                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                                                 & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
                                                 & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
                     else
@@ -1275,8 +1275,8 @@ contains
                                 G_local = G_local*max((1._wp - damage_state), 0._wp)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l), &
-                                                    & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
+                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
                                                     & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
                                                     & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
                         else
@@ -1287,8 +1287,8 @@ contains
                         if (model_eqns == 4) then
                             lit_gamma = gs_min(1)
                         else if (elasticity) then
-                            do s = 1, 3
-                                tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
+                            do s = 1, (num_dims*(num_dims + 1))/2
+                                tau_e(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l)/rho
                             end do
                         end if
 
@@ -1362,10 +1362,11 @@ contains
                                     G_local = G_local*max((1._wp - damage_state), 0._wp)
                                 end if
 
-                                call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l - 2), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
-                                                        & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                        & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l - 2), &
-                                                        & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
+                                                        & rho, qv, rhoYks, pres, T, q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, &
+                                                        & k - 2, l - 2), q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), &
+                                                        & G_local)
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
