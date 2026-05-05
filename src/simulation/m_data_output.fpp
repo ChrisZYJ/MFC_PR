@@ -1136,7 +1136,7 @@ contains
             damage_state = 0._wp
 
             if (n == 0) then
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
+                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x < x_cb(m) .or. (probe(i)%x <= x_cb(m) .and. bc_x%end < 0))) then
                     do s = -1, m
                         distx(s) = x_cb(s) - probe(i)%x
                         if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1244,8 +1244,8 @@ contains
                     end do
                 end if
 
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
+                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x < x_cb(m) .or. (probe(i)%x <= x_cb(m) .and. bc_x%end < 0))) then
+                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y < y_cb(n) .or. (probe(i)%y <= y_cb(n) .and. bc_y%end < 0))) then
                         do s = -1, m
                             distx(s) = x_cb(s) - probe(i)%x
                             if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1319,9 +1319,10 @@ contains
                     end if
                 end if
             else
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
-                        if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
+                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x < x_cb(m) .or. (probe(i)%x <= x_cb(m) .and. bc_x%end < 0))) then
+                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y < y_cb(n) .or. (probe(i)%y <= y_cb(n) .and. bc_y%end < 0))) then
+                        if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z < z_cb(p) .or. (probe(i)%z <= z_cb(p) .and. bc_z%end < 0))) &
+                            & then
                             do s = -1, m
                                 distx(s) = x_cb(s) - probe(i)%x
                                 if (distx(s) < 0._wp) distx(s) = 1000._wp
