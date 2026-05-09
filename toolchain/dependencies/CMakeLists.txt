@@ -49,27 +49,26 @@ endif()
 
 # HDF5
 if (MFC_HDF5)
-    find_package(HDF5)
-    if (HDF5_FOUND)
-        message(STATUS "HDF5 found.")
-        add_custom_target(hdf5)
-    else()
-        ExternalProject_Add(hdf5
-            GIT_REPOSITORY "https://github.com/HDFGroup/hdf5"
-            GIT_TAG        hdf5-1_12_2
-            GIT_SHALLOW    ON
-            GIT_PROGRESS   ON
-            CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-                            -DBUILD_SHARED_LIBS=OFF
-                            -DBUILD_TESTING=OFF
-                            -DHDF5_BUILD_UTILS=OFF
-                            -DHDF5_BUILD_TOOLS=ON
-                            -DHDF5_BUILD_EXAMPLES=OFF
-                            -DHDF5_BUILD_CPP_LIB=OFF
-                            -DHDF5_BUILD_FORTRAN=OFF
-                            -DHDF5_ENABLE_PARALLEL=OFF
-        )
-    endif()
+    # Always build the bundled HDF5: a system HDF5 (e.g. one transitively
+    # provided by an anaconda module) often lacks the parallel/MPI variant
+    # that the bundled SILO 4.12.0 requires, leading to undefined references
+    # to H5Pset_fapl_mpio and the H5_libinit_g/H5_libterm_g symbols at
+    # link time. Build our own to keep the dependency stack consistent.
+    ExternalProject_Add(hdf5
+        GIT_REPOSITORY "https://github.com/HDFGroup/hdf5"
+        GIT_TAG        hdf5-1_12_2
+        GIT_SHALLOW    ON
+        GIT_PROGRESS   ON
+        CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+                        -DBUILD_SHARED_LIBS=OFF
+                        -DBUILD_TESTING=OFF
+                        -DHDF5_BUILD_UTILS=OFF
+                        -DHDF5_BUILD_TOOLS=ON
+                        -DHDF5_BUILD_EXAMPLES=OFF
+                        -DHDF5_BUILD_CPP_LIB=OFF
+                        -DHDF5_BUILD_FORTRAN=OFF
+                        -DHDF5_ENABLE_PARALLEL=OFF
+    )
 endif()
 
 
