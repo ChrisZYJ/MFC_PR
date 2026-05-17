@@ -148,35 +148,37 @@ module m_global_parameters
     logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
-    real(wp)           :: muscl_eps                    !< MUSCL limiter slope-product threshold
-    real(wp)           :: weno_eps                     !< Binding for the WENO nonlinear weights
-    real(wp)           :: teno_CT                      !< Smoothness threshold for TENO
-    logical            :: mp_weno                      !< Monotonicity preserving (MP) WENO
-    logical            :: weno_avg                     !< Average left/right cell-boundary states
-    logical            :: weno_Re_flux                 !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer            :: riemann_solver               !< Riemann solver algorithm
-    logical            :: riemann_hypo_ADC
-    real(wp)           :: ADC_kappa
-    logical            :: hll_u_interface              !< T = HLL Method 2 (u-interface), F = HLL Method 1 (alpha-interface)
-    logical            :: hypo_hll_interface_rhs       !< When T, HLL hypo uses interface-consistent RHS instead of legacy FD
-    logical            :: hypo_nc_finite_diff
-    logical            :: hypo_nc_interface
-    logical            :: hypo_nc_dual_pass
-    logical            :: adv_src_alpha_iface          !< flux_src exports per-fluid interface alpha
-    logical            :: adv_src_vel_iface            !< flux_src exports shared face-normal interface velocity
-    logical            :: adv_src_none                 !< flux_src exports no NC advection quantity
-    logical            :: use_nc_iface_vel             !< nc_iface_vel exports interface velocities needed outside flux_src
-    integer            :: low_Mach                     !< Low Mach number fix to HLLC Riemann solver
-    integer            :: wave_speeds                  !< Wave speeds estimation method
-    integer            :: avg_state                    !< Average state evaluation method
-    logical            :: alt_soundspeed               !< Alternate mixture sound speed
-    logical            :: null_weights                 !< Null undesired WENO weights
-    logical            :: mixture_err                  !< Mixture properties correction
-    logical            :: hypoelasticity               !< hypoelasticity modeling
-    logical            :: hyperelasticity              !< hyperelasticity modeling
-    logical            :: int_comp                     !< THINC interface compression
-    real(wp)           :: ic_eps                       !< THINC Epsilon to compress on surface cells
-    real(wp)           :: ic_beta                      !< THINC Sharpness Parameter
+    real(wp) :: muscl_eps               !< MUSCL limiter slope-product threshold
+    real(wp) :: weno_eps                !< Binding for the WENO nonlinear weights
+    real(wp) :: teno_CT                 !< Smoothness threshold for TENO
+    logical  :: mp_weno                 !< Monotonicity preserving (MP) WENO
+    logical  :: weno_avg                !< Average left/right cell-boundary states
+    logical  :: weno_Re_flux            !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer  :: riemann_solver          !< Riemann solver algorithm
+    logical  :: riemann_hypo_ADC
+    real(wp) :: ADC_kappa
+    logical  :: hll_u_interface         !< T = HLL Method 2 (u-interface), F = HLL Method 1 (alpha-interface)
+    logical  :: hypo_hll_interface_rhs  !< When T, HLL hypo uses interface-consistent RHS instead of legacy FD
+    logical  :: hypo_energy_guard       !< Guard elastic energy E_e when mixture G near zero
+    logical  :: hypo_nc_finite_diff
+    logical  :: hypo_nc_interface
+    logical  :: hypo_nc_dual_pass
+    logical  :: adv_src_alpha_iface     !< flux_src exports per-fluid interface alpha
+    logical  :: adv_src_vel_iface       !< flux_src exports shared face-normal interface velocity
+    logical  :: adv_src_none            !< flux_src exports no NC advection quantity
+    logical  :: use_nc_iface_vel        !< nc_iface_vel exports interface velocities needed outside flux_src
+    integer  :: low_Mach                !< Low Mach number fix to HLLC Riemann solver
+    integer  :: wave_speeds             !< Wave speeds estimation method
+    integer  :: avg_state               !< Average state evaluation method
+    logical  :: alt_soundspeed          !< Alternate mixture sound speed
+    logical  :: null_weights            !< Null undesired WENO weights
+    logical  :: mixture_err             !< Mixture properties correction
+    logical  :: hypoelasticity          !< hypoelasticity modeling
+    logical  :: hyperelasticity         !< hyperelasticity modeling
+    integer  :: int_comp                !< Interface compression: 0=off, 1=THINC, 2=MTHINC
+    real(wp) :: ic_eps                  !< THINC Epsilon to compress on surface cells
+    real(wp) :: ic_beta                 !< THINC Sharpness Parameter
+    $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer            :: hyper_model                  !< hyperelasticity solver algorithm
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
@@ -214,7 +216,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress, cont_damage, hyper_cleaning]')
-    $:GPU_DECLARE(create='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_nc_interface]')
+    $:GPU_DECLARE(create='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard, hypo_nc_interface]')
 
     logical  :: relax         !< activate phase change
     integer  :: relax_model   !< Relaxation model
@@ -547,6 +549,7 @@ contains
         ADC_kappa = 1.0_wp
         hll_u_interface = .false.
         hypo_hll_interface_rhs = .false.
+        hypo_energy_guard = .true.
         hypo_nc_finite_diff = .false.
         hypo_nc_interface = .false.
         hypo_nc_dual_pass = .false.
@@ -570,7 +573,7 @@ contains
         ptgalpha_eps = dflt_real
         hypoelasticity = .false.
         hyperelasticity = .false.
-        int_comp = .false.
+        int_comp = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
         elasticity = .false.
@@ -865,7 +868,6 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
-
             if (recon_type == WENO_TYPE) then
                 weno_polyn = (weno_order - 1)/2
                 if (teno) then
@@ -1202,7 +1204,7 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
-        if (mhd) then  ! TODO merge with above; waiting for hyperelasticity PR
+        if (mhd) then
             fd_number = max(1, fd_order/2)
         end if
 
@@ -1254,7 +1256,7 @@ contains
             grid_geometry = 1
         else if (cyl_coord .and. p == 0) then  ! Axisymmetric cylindrical grid
             grid_geometry = 2
-        else  ! Fully 3D cylindrical grid
+        else
             grid_geometry = 3
         end if
 
@@ -1276,7 +1278,7 @@ contains
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
                      & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
                      & hyperelasticity, hyper_model, elasticity, low_Mach]')
-        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_nc_interface]')
+        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard, hypo_nc_interface]')
 
         $:GPU_UPDATE(device='[Bx0]')
 
@@ -1295,6 +1297,7 @@ contains
             $:GPU_UPDATE(device='[num_fluids, num_dims, viscous, num_vels, nb, muscl_lim]')
         #:endif
 
+        $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')
         $:GPU_UPDATE(device='[muscl_eps]')
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
