@@ -1235,8 +1235,8 @@ contains
         ! HLL Method 1 (alpha-interface): flux_src(adv_idx%beg:adv_idx%end) carries interface alpha_k per fluid.
         adv_src_alpha_iface = (riemann_solver == 1 .and. .not. hll_u_interface)
         ! HLLC, HLL Method 2 (u-interface), exact, LF: flux_src(adv_idx%beg) carries one shared face-normal interface velocity.
-        adv_src_vel_iface = (riemann_solver == 1 .and. hll_u_interface) &
-                             & .or. riemann_solver == 2 .or. riemann_solver == 3 .or. riemann_solver == 5
+        adv_src_vel_iface = (riemann_solver == 1 .and. hll_u_interface) .or. riemann_solver == 2 .or. riemann_solver == 3 &
+                             & .or. riemann_solver == 5
         ! MHD HLLD: single species, so there is no volume fraction to advect. Hypo HLLD: the dual-pass formulation keeps all NC
         ! terms inside the Riemann flux.
         adv_src_none = (riemann_solver == 4)
@@ -1266,8 +1266,8 @@ contains
         ! 1. adv_src_alpha_iface + alt_soundspeed: face-normal velocity only, for the KdivU correction (flux_src already carries
         ! alpha in this mode) 2. hypo_nc_interface: all components for the hypoelastic velocity-gradient tensor 3. hypo_nc_dual_pass
         ! + axisym: normal + tangential velocity for the axisymmetric geometry correction
-        use_nc_iface_vel = hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            & .or. (adv_src_alpha_iface .and. alt_soundspeed)
+        use_nc_iface_vel = hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) .or. (adv_src_alpha_iface &
+            & .and. alt_soundspeed)
 
         $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
         $:GPU_UPDATE(device='[b_size, tensor_size]')
