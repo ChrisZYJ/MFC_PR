@@ -4028,17 +4028,8 @@ contains
 
         ! Local variables:
 
-        ! q_prim_vf with indiced permutated to match qL_prim_rs${XYZ}$_vf But note that q_prim_vf and q_hat_prim_x_vf are
-        ! cell-centered while qL_prim_rs${XYZ}$_vf etc. are cell-boundary values
-
-        real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end, &
-             & 1:sys_size) :: q_hat_prim_x_vf
-
-        real(wp), dimension(idwbuff(2)%beg:idwbuff(2)%end,idwbuff(1)%beg:idwbuff(1)%end,idwbuff(3)%beg:idwbuff(3)%end, &
-             & 1:sys_size) :: q_hat_prim_y_vf
-
-        real(wp), dimension(idwbuff(3)%beg:idwbuff(3)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(1)%beg:idwbuff(1)%end, &
-             & 1:sys_size) :: q_hat_prim_z_vf
+        ! Anchor (hat) primitives are read directly from cell-centered q_prim_vf at the interface
+        ! location (see hat_off / HATIDX below); no q_hat_prim staging buffer or fill kernel.
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
@@ -4119,6 +4110,7 @@ contains
         real(wp), parameter :: ADC_power = 1.0_wp
         real(wp)            :: alpha_L_sum, alpha_R_sum
         integer             :: i, j, k, l
+        integer             :: hat_off  ! anchor offset: 0 for hat_L (cell j), 1 for hat_R (cell j+1)
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -4126,39 +4118,14 @@ contains
 
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
 
+        hat_off = merge(0, 1, is_hat_L)  ! hat_L anchors cell j; hat_R anchors cell j+1
+
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
-                ! Fill q_hat_prim with cell-centered primitives at the interface location.
-                $:GPU_ENTER_DATA(create='[q_hat_prim_' + XYZ + '_vf]')
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                #:if NORM_DIR == 1
-                                    if (is_hat_L) then
-                                        q_hat_prim_x_vf(j, k, l, i) = q_prim_vf(i)%sf(j, k, l)
-                                    else
-                                        q_hat_prim_x_vf(j, k, l, i) = q_prim_vf(i)%sf(j + 1, k, l)
-                                    end if
-                                #:elif NORM_DIR == 2
-                                    if (is_hat_L) then
-                                        q_hat_prim_y_vf(j, k, l, i) = q_prim_vf(i)%sf(k, j, l)
-                                    else
-                                        q_hat_prim_y_vf(j, k, l, i) = q_prim_vf(i)%sf(k, j + 1, l)
-                                    end if
-                                #:else
-                                    if (is_hat_L) then
-                                        q_hat_prim_z_vf(j, k, l, i) = q_prim_vf(i)%sf(l, k, j)
-                                    else
-                                        q_hat_prim_z_vf(j, k, l, i) = q_prim_vf(i)%sf(l, k, j + 1)
-                                    end if
-                                #:endif
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
+                ! Anchor (hat) cell read directly from cell-centered q_prim_vf at the interface
+                ! location; hat_off places j (hat_L) or j+1 (hat_R) in the normal-direction slot.
+                ! This deletes the q_hat_prim staging buffer + its fill kernel (a strided copy).
+                #:set HATIDX = {1: 'j + hat_off, k, l', 2: 'k, j + hat_off, l', 3: 'l, k, j + hat_off'}[NORM_DIR]
 
                 #:set _hlld_p1 = '[i,j,k,l,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,U_starL,U_starR,U_starstarL,U_starstarR,F_L,F_R,F_starL,F_starR,F_hlld,F_HLL,U_HLL,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
@@ -4174,7 +4141,7 @@ contains
                                 alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
                                 alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
 
-                                alpha_rho_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, i)
+                                alpha_rho_hat(i) = q_prim_vf(i)%sf(${HATIDX}$)
                             end do
 
                             ! IMP: vel%L(1:3) has (3) uninitiated for 2D
@@ -4187,7 +4154,7 @@ contains
                                 vel%L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%cont%end + i)
                                 vel%R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%cont%end + i)
 
-                                vel_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, eqn_idx%cont%end + i)
+                                vel_hat(i) = q_prim_vf(eqn_idx%cont%end + i)%sf(${HATIDX}$)
                             end do
 
                             vel_rms%L = vel%L(1)**2 + vel%L(2)**2 + vel%L(3)**2
@@ -4197,7 +4164,7 @@ contains
                                 alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
                                 alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
 
-                                alpha_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, eqn_idx%E + i)
+                                alpha_hat(i) = q_prim_vf(eqn_idx%E + i)%sf(${HATIDX}$)
                             end do
 
                             ! Clamp and renormalize volume fractions when mpp_lim is on (match HLL/HLLC)
@@ -4228,7 +4195,7 @@ contains
                                 tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%stress%beg - 1 + i)
                                 tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%stress%beg - 1 + i)
 
-                                tau_e_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, eqn_idx%stress%beg - 1 + i)
+                                tau_e_hat(i) = q_prim_vf(eqn_idx%stress%beg - 1 + i)%sf(${HATIDX}$)
                             end do
 
                             u_t2_L = 0._wp; u_t2_R = 0._wp; u_t2_hat = 0._wp
@@ -4351,7 +4318,7 @@ contains
 
                             K_hat = 0._wp
                             if (alt_soundspeed) then
-                                pres_hat = q_hat_prim_${XYZ}$_vf(j, k, l, eqn_idx%E)
+                                pres_hat = q_prim_vf(eqn_idx%E)%sf(${HATIDX}$)
                                 blkmod1_hat = ((gammas(1) + 1._wp)*pres_hat + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_rs(1)
                                 blkmod2_hat = ((gammas(2) + 1._wp)*pres_hat + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_rs(2)
                                 K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat)/(alpha_hat(1)*blkmod2_hat &
@@ -4889,7 +4856,6 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-                $:GPU_EXIT_DATA(delete='[q_hat_prim_' + XYZ + '_vf]')
             end if
         #:endfor
 
